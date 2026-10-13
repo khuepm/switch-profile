@@ -43,6 +43,8 @@ Negative examples include `github.com.example.org`, URLs containing `github.com`
 - Manual results record the macOS and Chrome versions, window/tab behavior and any limitations.
 - A local `.app` and accurate install, default-browser setup, restore and removal instructions are available.
 
+Automated and manual results are tracked in the [acceptance matrix](ACCEPTANCE.md).
+
 ## Delivery workflow
 
 Use the issue's GitHub Project status when applicable. This repository was initialized without a Project, so status labels are used: `status:in-progress` while working, then `status:done` after verification and merge. Use an issue-prefixed branch and PR title; link the issue in the PR and use `Closes #<id>` only when it is fully resolved. Merge into `main` after required checks pass.
