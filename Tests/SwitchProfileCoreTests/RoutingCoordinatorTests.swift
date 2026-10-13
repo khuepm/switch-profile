@@ -6,6 +6,8 @@ import Testing
 @MainActor
 final class FakeCatalogLoader {
     var state: CatalogState
+    /// When false, the loader skips the seeding hook (only `ConfigController.resetToDefaults` seeds).
+    var seeds = true
     private(set) var count = 0
     private let config: ConfigController
 
@@ -16,7 +18,7 @@ final class FakeCatalogLoader {
 
     func load() -> CatalogState {
         count += 1
-        if case .loaded(let catalog) = state { config.catalogDidLoad(catalog) }
+        if seeds, case .loaded(let catalog) = state { config.catalogDidLoad(catalog) }
         return state
     }
 }
@@ -678,6 +680,71 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(h.opener.directories == ["Default"])
         #expect(h.opener.urls == [Links.r3(1).absoluteString])
         #expect(h.coordinator.pending.items.isEmpty)
+    }
+
+    // MARK: Final review #1: seeding re-routes `.unset` links
+
+    @Test func firstRunUnsetLinkReroutesWhenALaterCatalogLoadSeedsItsRule() async throws {
+        // Absent config.json and unreadable Local State (P-1): seeding cannot run, the link pends `.unset`.
+        let h = try CoordinatorHarness(catalog: .unavailable(.notFound("/x/Local State")))
+        defer { h.cleanup() }
+        #expect(h.loadedConfig == .unseededDefault)
+        h.enqueue(Links.r3(1))
+        await h.coordinator.waitUntilIdle()
+        let item = try #require(h.coordinator.pending.items.first)
+        #expect(item.kind == .needsProfile(.unset))
+
+        // "Check rule" seeds but never launches.
+        h.loader.state = .loaded(Fixture.validCatalog())
+        _ = h.coordinator.loadCatalog(reroutingBlocked: false)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
+        #expect(h.coordinator.pending.items == [item])
+        #expect(h.opener.callCount == 0)
+
+        // The next blocking load ("Refresh profiles") picks the bound `.unset` item up.
+        _ = h.coordinator.loadCatalog()
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.callCount == 1)
+        #expect(h.opener.directories == ["Default"])
+        #expect(h.opener.urls == [Links.r3(1).absoluteString])
+        #expect(h.coordinator.pending.items.isEmpty)
+    }
+
+    @Test func unsetLinkOfAStillUnboundRuleStaysPendingAfterACatalogLoad() async throws {
+        let h = try CoordinatorHarness(catalog: .unavailable(.notFound("/x/Local State")))
+        defer { h.cleanup() }
+        h.enqueue(Links.r4(1))
+        await h.coordinator.waitUntilIdle()
+        let item = try #require(h.coordinator.pending.items.first)
+        #expect(item.kind == .needsProfile(.unset))
+
+        // Seeding binds R1-R3 only; R4 stays "Not set".
+        h.loader.state = .loaded(Fixture.validCatalog())
+        _ = h.coordinator.loadCatalog()
+        await h.coordinator.waitUntilIdle()
+        #expect(h.coordinator.pending.items == [item])
+        #expect(h.opener.callCount == 0)
+    }
+
+    @Test func resetConfigToDefaultsReroutesUnsetLinksOfNewlySeededRules() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([:])
+        h.enqueue(Links.r4(1), Links.r3(2))
+        await h.coordinator.waitUntilIdle()
+        #expect(h.coordinator.pending.items.map(\.kind) == [.needsProfile(.unset), .needsProfile(.unset)])
+
+        // Seeding happens only in ConfigController.resetToDefaults, after the coordinator's load.
+        h.loader.seeds = false
+        try h.coordinator.resetConfigToDefaults()
+        #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.callCount == 1)
+        #expect(h.opener.directories == ["Default"])
+        #expect(h.opener.urls == [Links.r3(2).absoluteString])
+        #expect(h.pendingItem(Links.r3(2)) == nil)
+        #expect(h.pendingItem(Links.r4(1))?.kind == .needsProfile(.unset))
     }
 
     // MARK: Design review NITs

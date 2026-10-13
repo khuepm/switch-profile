@@ -79,7 +79,9 @@ public final class RoutingCoordinator {
 
     /// The single catalog read used by the worker and every UI path. On a successful load with
     /// `reroutingBlocked`, every `.needsProfile(.catalogUnavailable)` item (all rules) is re-enqueued
-    /// with its last attempt. "Check rule" passes `false`, so a preview never causes a launch.
+    /// with its last attempt, and every `.needsProfile(.unset)` item whose rule now has a binding
+    /// (typically just seeded by this or an earlier load) is re-enqueued as `.route`.
+    /// "Check rule" passes `false`, so a preview never causes a launch.
     /// The sink is notified only when items were re-enqueued, so plain reads cause no UI fan-out.
     public func loadCatalog(reroutingBlocked: Bool = true) -> CatalogState {
         loadCatalog(reroutingBlocked: reroutingBlocked, excluding: nil)
@@ -114,15 +116,16 @@ public final class RoutingCoordinator {
     }
 
     /// "Reset to defaults…" for the menu and Settings. On success every
-    /// `.needsProfile(.configUnavailable)` item (all rules) is re-enqueued with its last attempt.
+    /// `.needsProfile(.configUnavailable)` item (all rules) is re-enqueued with its last attempt, and
+    /// every `.needsProfile(.unset)` item whose rule the reset seeded is re-enqueued as `.route`.
     public func resetConfigToDefaults() throws(ConfigError) {
         try config.resetToDefaults(catalogLoader: { self.loadCatalog() })
         let items = pending.items.filter {
             if case .needsProfile(.configUnavailable) = $0.kind { return true }
-            return false
+            return isBoundUnset($0)
         }
         for item in items {
-            requeue(item, kind: item.lastAttempt)
+            requeue(item, kind: isBoundUnset(item) ? .route : item.lastAttempt)
         }
         startDrainIfNeeded()
         sink?.coordinatorDidChange()
@@ -261,15 +264,18 @@ public final class RoutingCoordinator {
     private func loadCatalog(reroutingBlocked: Bool, excluding excluded: UUID?) -> CatalogState {
         let state = catalogLoader()
         guard reroutingBlocked, case .loaded = state else { return state }
+        // State-based, not a before/after diff: a seed during a `reroutingBlocked: false` load is
+        // picked up here on the next load. A bound rule never routes back to `.unset`, so no loop.
         let items = pending.items.filter {
-            guard $0.id != excluded, case .needsProfile(.catalogUnavailable) = $0.kind else { return false }
-            return true
+            guard $0.id != excluded else { return false }
+            if case .needsProfile(.catalogUnavailable) = $0.kind { return true }
+            return isBoundUnset($0)
         }
         guard !items.isEmpty else { return state }
         for item in items {
-            requeue(item, kind: item.lastAttempt)
+            requeue(item, kind: isBoundUnset(item) ? .route : item.lastAttempt)
         }
-        Log.routing.info("Chrome profiles available again; re-routing \(items.count, privacy: .public) pending link(s)")
+        Log.routing.info("Chrome profiles loaded; re-routing \(items.count, privacy: .public) pending link(s)")
         startDrainIfNeeded()
         sink?.coordinatorDidChange()
         return state
@@ -299,6 +305,13 @@ public final class RoutingCoordinator {
         if recent.count > Self.recentCapacity {
             recent.removeLast(recent.count - Self.recentCapacity)
         }
+    }
+
+    /// A `.needsProfile(.unset)` item whose rule has a binding in the current configuration,
+    /// e.g. after first-run seeding ran on a later successful catalog load.
+    private func isBoundUnset(_ item: PendingItem) -> Bool {
+        guard case .needsProfile(.unset) = item.kind, case .loaded(let current) = config.routingConfig else { return false }
+        return current.targets[item.rule].binding != nil
     }
 
     private static func isReroutable(_ kind: PendingKind) -> Bool {
