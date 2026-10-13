@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 2,
+  "targets": "not an object",
+  "rules": [1, 2, 3]
+}

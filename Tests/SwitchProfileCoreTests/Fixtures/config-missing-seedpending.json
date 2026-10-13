@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "R1": { "identity": "khuepm18" },
+    "R2": { "identity": "khue@truckerpoints.ai" },
+    "R3": { "identity": "pmkhue.2013" },
+    "R4": { }
+  }
+}

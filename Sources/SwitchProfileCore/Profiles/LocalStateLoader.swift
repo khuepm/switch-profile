@@ -23,7 +23,7 @@ public enum LocalStateLoader {
         do {
             root = try JSONDecoder().decode(Root.self, from: data)
         } catch let error as DecodingError {
-            throw .malformed(summary(of: error))
+            throw .malformed(error.summary)
         } catch {
             throw .malformed(error.localizedDescription)
         }
@@ -62,24 +62,6 @@ public enum LocalStateLoader {
             return nil
         }
         return trimmed
-    }
-
-    private static func summary(of error: DecodingError) -> String {
-        func path(_ codingPath: [any CodingKey]) -> String {
-            codingPath.map(\.stringValue).joined(separator: ".")
-        }
-        switch error {
-        case .dataCorrupted(let context):
-            return "data corrupted at '\(path(context.codingPath))': \(context.debugDescription)"
-        case .keyNotFound(let key, let context):
-            return "missing key '\(path(context.codingPath + [key]))'"
-        case .typeMismatch(_, let context):
-            return "type mismatch at '\(path(context.codingPath))': \(context.debugDescription)"
-        case .valueNotFound(_, let context):
-            return "null value at '\(path(context.codingPath))': \(context.debugDescription)"
-        @unknown default:
-            return String(describing: error)
-        }
     }
 
     // Minimal view of Local State; unknown keys are ignored.
