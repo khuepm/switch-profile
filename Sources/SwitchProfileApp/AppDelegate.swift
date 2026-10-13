@@ -10,7 +10,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
     /// What every consumer other than the coordinator uses, so catalog recovery re-routes pending links.
     private let catalogLoader: @MainActor () -> CatalogState
 
+    private let defaultBrowserService = DefaultBrowserService()
+
     private var statusItemController: StatusItemController?
+    /// Created lazily.
+    private var settingsWindowController: SettingsWindowController?
+    private var resolutionWindowController: ResolutionWindowController?
+    private var settingsModel: SettingsModel? { settingsWindowController?.model }
     private var isRefreshingAttention = false
     private var terminationSource: (any DispatchSourceSignal)?
 
@@ -58,11 +64,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
             configController: configController,
             actions: StatusItemController.Actions(
                 refreshMappingAttention: { [weak self] in self?.refreshMappingAttention() },
-                defaultBrowserSummary: { nil },
-                setAsDefault: {},
-                showPending: {},
-                resetToDefaults: {},
-                openSettings: {}
+                defaultBrowserSummary: { [weak self] in self?.defaultBrowserSummary() },
+                setAsDefault: { [weak self] in
+                    // NIT #7: the dialog flow lives in Settings, so its status and messages are visible.
+                    self?.showSettings()
+                    self?.settingsModel?.setAsDefault()
+                },
+                showPending: { [weak self] in self?.showPendingLinks() },
+                resetToDefaults: { [weak self] in self?.confirmAndResetToDefaults() },
+                openSettings: { [weak self] in self?.showSettings() }
             )
         )
         coordinator.sink = self
@@ -98,6 +108,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
         if configChanged { refreshMappingAttention() }
         // 1. Icon and attention state.
         statusItemController?.refresh()
+        // 2. The resolution window follows the pending store.
+        if coordinator.pending.items.isEmpty {
+            resolutionWindowController?.close()
+        } else {
+            showPendingLinks()
+        }
+        // 3. Settings, only if it exists.
+        settingsModel?.refresh()
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // §8.4 step 5: the app regains focus when the macOS confirmation dialog closes.
+        settingsModel?.defaultBrowserStatusMayHaveChanged()
+    }
+
+    // MARK: Windows and menu actions
+
+    private func showSettings() {
+        if settingsWindowController == nil {
+            let model = SettingsModel(configController: configController, coordinator: coordinator,
+                                      defaultBrowserService: defaultBrowserService,
+                                      confirmReset: { [weak self] in self?.confirmReset() ?? false })
+            settingsWindowController = SettingsWindowController(model: model)
+        }
+        settingsWindowController?.show()
+    }
+
+    private func showPendingLinks() {
+        if resolutionWindowController == nil {
+            resolutionWindowController = ResolutionWindowController(coordinator: coordinator, configController: configController)
+        }
+        resolutionWindowController?.showIfNeeded()
+    }
+
+    private func defaultBrowserSummary() -> (text: String, isDefault: Bool) {
+        let status = defaultBrowserService.status()
+        let text = "Default browser: \(status.isDefault ? "Yes" : "No") (http: \(UIText.handler(status.http)), https: \(UIText.handler(status.https)))"
+        return (text, status.isDefault)
+    }
+
+    private func confirmReset() -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Reset the configuration to defaults?"
+        alert.informativeText = "The current configuration file is backed up next to it, then replaced with the defaults. Profile mappings are detected again from Chrome."
+        alert.addButton(withTitle: "Reset")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// Menu "Configuration error – Reset to defaults…".
+    private func confirmAndResetToDefaults() {
+        guard confirmReset() else { return }
+        do throws(ConfigError) {
+            try coordinator.resetConfigToDefaults()
+        } catch {
+            let alert = NSAlert()
+            alert.alertStyle = .critical
+            alert.messageText = "Could not reset the configuration"
+            alert.informativeText = UIText.configError(error)
+            alert.runModal()
+        }
     }
 
     /// Flags rules whose binding is missing or changed account, without waiting for a URL.
