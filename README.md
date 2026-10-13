@@ -39,13 +39,13 @@ Hosts match exactly. Subdomains such as `www.github.com`, `api.github.com`, `gis
 
 Profile display names and email addresses are not necessarily directory names. The app maps them to actual existing profile directories such as `Default` or `Profile 2`, without guessing, modifying login data, or silently creating a new profile.
 
-## Implementation plan
+## What v0.1.0 includes
 
-1. Verify launching each of the three profiles with Chrome running and closed.
-2. Build a native macOS AppKit app that receives HTTP/HTTPS URL-open events.
-3. Implement deterministic repository/domain rules, fallback routing, and loop prevention.
-4. Add menu-bar access, settings, profile mapping, and a routing preview.
-5. Test end-to-end routing and package a local `.app` demo with setup and uninstall instructions.
+1. A native macOS AppKit menu bar app that receives HTTP/HTTPS URL-open events.
+2. Ordered repository/domain rules, fallback routing, and loop prevention.
+3. Menu bar access, settings, profile mapping, and a routing preview.
+4. A local `.app` built by one script, with setup and removal instructions below.
+5. Automated tests for routing, configuration, and launching. The manual checks (each profile with Chrome running and closed, and the end-to-end matrix) are tracked in the [acceptance matrix](docs/ACCEPTANCE.md).
 
 The target is a new tab in a window of the correct profile, or a new window when needed. Window reuse must be verified against the installed Chrome version. Signing, notarization, and automatic updates are follow-up work.
 

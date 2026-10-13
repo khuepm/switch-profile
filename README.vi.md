@@ -39,13 +39,13 @@ Tên miền được so khớp chính xác. Các tên miền con như `www.githu
 
 Tên hiển thị và địa chỉ email của profile không nhất thiết là tên thư mục. Ứng dụng ánh xạ đến thư mục profile thực tế như `Default` hoặc `Profile 2`, không suy đoán, không sửa dữ liệu đăng nhập và không âm thầm tạo profile mới.
 
-## Kế hoạch triển khai
+## Nội dung của v0.1.0
 
-1. Xác minh mở đúng cả ba profile khi Chrome đang chạy và đã đóng.
-2. Tạo ứng dụng macOS bằng AppKit, nhận sự kiện mở URL HTTP/HTTPS.
-3. Cài quy tắc repository/tên miền với thứ tự rõ ràng, profile dự phòng và chống vòng lặp.
-4. Thêm menu, cài đặt, ánh xạ profile và xem trước kết quả chọn quy tắc.
-5. Kiểm thử toàn bộ luồng và đóng gói demo `.app`, kèm hướng dẫn cài đặt và gỡ bỏ.
+1. Ứng dụng macOS bằng AppKit chạy trên thanh menu, nhận sự kiện mở URL HTTP/HTTPS.
+2. Quy tắc repository/tên miền với thứ tự rõ ràng, profile dự phòng và chống vòng lặp.
+3. Menu trên thanh menu, cài đặt, ánh xạ profile và xem trước kết quả chọn quy tắc.
+4. Một `.app` cục bộ được build bằng một script, kèm hướng dẫn cài đặt và gỡ bỏ bên dưới.
+5. Kiểm thử tự động cho định tuyến, cấu hình và khởi chạy. Các bước kiểm tra thủ công (từng profile khi Chrome đang chạy và đã đóng, cùng ma trận end-to-end) được theo dõi trong [ma trận nghiệm thu](docs/ACCEPTANCE.md).
 
 Mục tiêu là mở tab trong cửa sổ của đúng profile, hoặc tạo cửa sổ nếu cần. Cần kiểm chứng việc tái sử dụng cửa sổ trên phiên bản Chrome thực tế. Ký ứng dụng, notarization và cập nhật tự động thuộc giai đoạn sau.
 
