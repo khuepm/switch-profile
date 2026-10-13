@@ -175,6 +175,38 @@ import Testing
             == .rejected(url: url, .unsupportedScheme("ftp")))
     }
 
+    // MARK: AC-11 fidelity through ChromeLauncher.makeRequest
+
+    static let acceptedVectors = URLClassifierTests.r1 + URLClassifierTests.r2 + URLClassifierTests.r3 + URLClassifierTests.r4
+
+    @MainActor
+    private func request(for string: String) throws -> (URL, LaunchRequest) {
+        let url = try #require(URL(string: string))
+        let decision = Router.decide(url, config: Self.config(r4: Self.binding(Self.other)), catalog: Self.catalog)
+        let target = try #require(launchTarget(decision))
+        let launcher = ChromeLauncher(locator: FakeLocator(), opener: FakeOpener(), ownBundleIdentifier: "io.github.khuepm.switchprofile")
+        return (url, try launcher.makeRequest(for: target))
+    }
+
+    @MainActor
+    @Test(arguments: acceptedVectors)
+    func forwardedURLIsTheReceivedAbsoluteString(_ string: String) throws {
+        let (url, request) = try request(for: string)
+        #expect(request.arguments.last == url.absoluteString)
+        // IDN and full-width hosts are rewritten by URL(string:) before Switch Profile sees them,
+        // so only the ASCII vectors are also compared with the source literal.
+        if string.allSatisfy(\.isASCII) {
+            #expect(request.arguments.last == string)
+        }
+    }
+
+    @MainActor
+    @Test func queryAndFragmentAreForwardedLiterally() throws {
+        let literal = "https://github.com/TruckerPoints/trucker-points/pull/1?a=1&b=%20#L10-L20"
+        let (_, request) = try request(for: literal)
+        #expect(request.arguments == ["--profile-directory=Profile 47", literal])
+    }
+
     @Test func deterministic() {
         let urls = [Self.fisURL, Self.tpURL, Self.githubURL, Self.fallbackURL, URL(string: "ftp://x/")!]
         for url in urls {
