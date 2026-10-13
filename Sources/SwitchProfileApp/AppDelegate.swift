@@ -30,7 +30,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
             let state: CatalogState
             // Inside a closure, a plain `do` infers `any Error`; `do throws(...)` is required.
             do throws(LocalStateError) { state = .loaded(try LocalStateLoader.load(from: localState)) }
-            catch { state = .unavailable(error) }
+            catch {
+                state = .unavailable(error)
+                Log.profiles.error("Chrome profiles unavailable: \(AppDelegate.logSummary(error), privacy: .public)")
+            }
             if case .loaded(let catalog) = state { configController.catalogDidLoad(catalog) }   // seeding hook
             return state
         }
@@ -194,6 +197,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
             Log.profiles.notice("Profile mapping attention: \(attention.map(\.rawValue).joined(separator: ","), privacy: .public)")
         }
         statusItemController?.mappingAttention = attention
+    }
+
+    /// Error kind without paths (logging policy).
+    nonisolated static func logSummary(_ error: LocalStateError) -> String {
+        switch error {
+        case .notFound: "Local State not found"
+        case .unreadable(_, let reason): "Local State unreadable: \(reason)"
+        case .malformed(let reason): "Local State malformed: \(reason)"
+        case .noProfiles: "no profiles in Local State"
+        }
     }
 
     // MARK: SIGTERM
