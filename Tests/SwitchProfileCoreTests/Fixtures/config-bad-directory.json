@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "seedPending": false,
+  "targets": {
+    "R1": { "identity": "khuepm18", "binding": { "directory": "../x", "email": "khuepm18@example.com", "displayName": "khuepm18" } },
+    "R2": { },
+    "R3": { },
+    "R4": { }
+  }
+}

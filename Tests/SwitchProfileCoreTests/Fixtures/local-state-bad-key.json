@@ -1,0 +1,9 @@
+{
+  "profile": {
+    "info_cache": {
+      "../x": { "name": "traversal", "user_name": "traversal@example.com" },
+      "-x": { "name": "switch", "user_name": "switch@example.com" },
+      "Profile 1": { "name": "valid", "user_name": "valid@example.com" }
+    }
+  }
+}

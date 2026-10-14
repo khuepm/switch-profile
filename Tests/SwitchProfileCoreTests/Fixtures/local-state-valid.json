@@ -1,0 +1,16 @@
+{
+  "browser": { "enabled_labs_experiments": [] },
+  "profile": {
+    "last_used": "Profile 30",
+    "info_cache": {
+      "Profile 30": { "name": "khuepm18", "user_name": "khuepm18@example.com", "gaia_name": "Khue Test", "is_using_default_name": false },
+      "Profile 47": { "name": "truckerpoints.ai", "user_name": "khue@truckerpoints.ai", "gaia_name": "Khue TP" },
+      "Default": { "name": "Person 1", "user_name": "pmkhue.2013@example.com" },
+      "Profile 5": { "name": "Dup A", "user_name": "dup@example.com" },
+      "Profile 6": { "name": "Dup B", "user_name": "dup@example.com" },
+      "Profile 7": { "name": "bob" },
+      "Profile 8": { "user_name": "bob@example.com" },
+      "Profile 9": { "name": "Signed out", "user_name": "" }
+    }
+  }
+}

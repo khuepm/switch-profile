@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "seedPending": false,
+  "targets": {
+    "R1": { "identity": "khuepm18", "binding": { "directory": "Profile 30", "email": "khuepm18@example.com", "displayName": "khuepm18", "matchedBy": "displayName" } },
+    "R2": { "identity": "khue@truckerpoints.ai", "binding": { "directory": "Profile 47", "email": "khue@truckerpoints.ai", "displayName": "truckerpoints.ai" } },
+    "R3": { "identity": "pmkhue.2013", "binding": null },
+    "R4": { }
+  },
+  "previousDefaultBrowser": { "bundleIdentifier": "com.google.Chrome", "path": "/Applications/Google Chrome.app" }
+}
