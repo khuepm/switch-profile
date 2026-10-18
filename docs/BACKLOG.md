@@ -27,7 +27,7 @@ P0 means required for correct routing or its verification. P1 means required for
 2. On `github.com`, match owner `TruckerPoints` and repository `trucker-points` as complete path segments, case-insensitively. Route the repository root and descendants to `khue@truckerpoints.ai` before considering the general GitHub rule.
 3. Route every path on exact host `git.fis.vn` to `khuepm18`.
 4. Route remaining links on exact host `github.com` to `pmkhue.2013`.
-5. Route other hosts to an explicitly configured fallback profile. If none is configured, ask the user to select one.
+5. Route other hosts to the explicitly configured fallback profile, or by default to Chrome's last active profile (launched without `--profile-directory`, #13).
 6. Preserve the original URL, including query and fragment; matching normalization must not rewrite the forwarded URL.
 7. Never silently substitute an account, create a missing profile, or send fallback URLs back through the system default-browser handler.
 
