@@ -16,15 +16,15 @@ import Testing
     static func mixedConfig() -> AppConfig {
         var config = AppConfig.unseededDefault
         config.seedPending = false
-        config.targets.R1.binding = ProfileBinding(profile: fis, matchedBy: nil)
-        config.targets.R2.binding = stale
-        config.targets.R3.binding = ProfileBinding(profile: personal, matchedBy: .localPart)
+        config.setBinding(ProfileBinding(profile: fis, matchedBy: nil), for: .r1)
+        config.setBinding(stale, for: .r2)
+        config.setBinding(ProfileBinding(profile: personal, matchedBy: .localPart), for: .r3)
         return config
     }
 
     @Test func statusCoversEveryCase() {
         var config = Self.mixedConfig()
-        config.targets.R4.binding = Self.gone
+        config.setBinding(Self.gone, for: .r4)
         let statuses = ConfigValidator.status(config: config, catalog: .loaded(Self.catalog))
         #expect(statuses == [
             .r1: .ok(Self.fis, autoDetected: nil),
@@ -52,7 +52,7 @@ import Testing
     ], [ProfileBinding?.some(gone), nil])
     func agreesWithRouter(_ catalog: CatalogState, _ fallback: ProfileBinding?) {
         var config = Self.mixedConfig()
-        config.targets.R4.binding = fallback
+        config.setBinding(fallback, for: .r4)
         let urls: [RuleID: URL] = [
             .r1: URL(string: "https://git.fis.vn/x")!,
             .r2: URL(string: "https://github.com/TruckerPoints/trucker-points")!,
@@ -60,7 +60,7 @@ import Testing
             .r4: URL(string: "https://example.com/")!,
         ]
         let statuses = ConfigValidator.status(config: config, catalog: catalog)
-        for rule in RuleID.allCases {
+        for rule in config.ruleOrder {
             let decision = Router.decide(urls[rule]!, config: .loaded(config), catalog: catalog)
             switch (statuses[rule]!, decision) {
             case (.ok(let profile, _), .launch(let target, _)):
@@ -105,19 +105,31 @@ import Testing
         #expect(ConfigValidator.confirmedBinding(for: status) == nil)
     }
 
+    static let order = AppConfig.unseededDefault.ruleOrder
+
     @Test func needsAttentionCountsOnlyBrokenBindings() {
         #expect(ConfigValidator.needsAttention([
             .r1: .ok(Self.fis, autoDetected: nil), .r2: .unset, .r3: .missing(Self.gone), .r4: .lastActiveChrome,
-        ]) == [.r3])
+        ], order: Self.order) == [.r3])
         #expect(ConfigValidator.needsAttention([
             .r1: .identityMismatch(Self.stale, current: Self.tp),
             .r2: .ok(Self.tp, autoDetected: .email),
             .r3: .missing(Self.gone),
             .r4: .ok(Self.signedOut, autoDetected: nil),
-        ]) == [.r1, .r3])
-        #expect(ConfigValidator.needsAttention([.r1: .unset, .r2: .unset, .r3: .unset, .r4: .unset]) == [])
-        #expect(ConfigValidator.needsAttention([.r1: .unset, .r2: .unset, .r3: .unset, .r4: .lastActiveChrome]) == [])
+        ], order: Self.order) == [.r1, .r3])
+        #expect(ConfigValidator.needsAttention([.r1: .unset, .r2: .unset, .r3: .unset, .r4: .unset], order: Self.order) == [])
+        #expect(ConfigValidator.needsAttention([.r1: .unset, .r2: .unset, .r3: .unset, .r4: .lastActiveChrome], order: Self.order) == [])
         let unavailable = TargetStatus.catalogUnavailable(.notFound("/x"))
-        #expect(ConfigValidator.needsAttention([.r1: unavailable, .r2: unavailable, .r3: unavailable, .r4: unavailable]) == [])
+        #expect(ConfigValidator.needsAttention([.r1: unavailable, .r2: unavailable, .r3: unavailable, .r4: unavailable], order: Self.order) == [])
+    }
+
+    /// The result follows the configuration's evaluation order, e.g. a user rule above R3.
+    @Test func needsAttentionFollowsEvaluationOrder() {
+        let order = [RuleID.r1, RuleID(number: 5), .r3, .r2, .fallback]
+        let statuses: [RuleID: TargetStatus] = [
+            .r1: .unset, RuleID(number: 5): .missing(Self.gone), .r2: .missing(Self.gone),
+            .r3: .identityMismatch(Self.stale, current: Self.tp), .r4: .lastActiveChrome,
+        ]
+        #expect(ConfigValidator.needsAttention(statuses, order: order) == [RuleID(number: 5), .r3, .r2])
     }
 }

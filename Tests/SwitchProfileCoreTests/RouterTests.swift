@@ -27,10 +27,10 @@ import Testing
                        r4: ProfileBinding? = nil) -> RoutingConfig {
         var config = AppConfig.unseededDefault
         config.seedPending = false
-        config.targets.R1.binding = r1
-        config.targets.R2.binding = r2
-        config.targets.R3.binding = r3
-        config.targets.R4.binding = r4
+        config.setBinding(r1, for: .r1)
+        config.setBinding(r2, for: .r2)
+        config.setBinding(r3, for: .r3)
+        config.setBinding(r4, for: .r4)
         return .loaded(config)
     }
 
@@ -240,6 +240,43 @@ import Testing
             let first = Router.decide(url, config: Self.config(), catalog: Self.catalog)
             let second = Router.decide(url, config: Self.config(), catalog: Self.catalog)
             #expect(first == second)
+        }
+    }
+
+    // MARK: #14: user rules
+
+    /// The `config-v2-valid` layout: a user rule R5 between R2 and R3.
+    @Test func userRuleAboveR3Wins() {
+        guard case .loaded(var config) = Self.config() else { return }
+        let r5 = RuleID(number: 5)
+        config.rules.insert(RoutingRule(id: r5, match: .hostPathPrefix(host: "github.com", pathPrefix: "/khuepm"),
+                                        binding: Self.binding(Self.other)), at: 2)
+        config.nextRuleNumber = 6
+        let decision = Router.decide(Self.githubURL, config: .loaded(config), catalog: Self.catalog)
+        #expect(launchTarget(decision) == LaunchTarget(url: Self.githubURL, rule: r5, directory: "Profile 10"))
+        // R2 is still above R5, and other github.com links still reach R3.
+        #expect(launchTarget(Router.decide(Self.tpURL, config: .loaded(config), catalog: Self.catalog))?.rule == .r2)
+        let sibling = URL(string: "https://github.com/TruckerPoints/trucker-points-other")!
+        #expect(launchTarget(Router.decide(sibling, config: .loaded(config), catalog: Self.catalog))?.rule == .r3)
+    }
+
+    @Test func deletedDefaultRuleFallsThrough() {
+        guard case .loaded(var config) = Self.config() else { return }
+        config.rules.removeAll { $0.id == .r2 }
+        #expect(launchTarget(Router.decide(Self.tpURL, config: .loaded(config), catalog: Self.catalog))
+            == LaunchTarget(url: Self.tpURL, rule: .r3, directory: "Default"))
+        config.rules.removeAll()
+        #expect(launchTarget(Router.decide(Self.fisURL, config: .loaded(config), catalog: Self.catalog))
+            == LaunchTarget(url: Self.fisURL, rule: .r4, profile: .lastActiveChrome))
+    }
+
+    @Test func configUnavailableClassifiesWithBuiltInRules() {
+        let unavailable = RoutingConfig.unavailable(.unsupportedVersion(3))
+        let expected: [(URL, RuleID)] = [(Self.fisURL, .r1), (Self.tpURL, .r2), (Self.githubURL, .r3), (Self.fallbackURL, .r4)]
+        for (url, rule) in expected {
+            let decision = Router.decide(url, config: unavailable, catalog: Self.catalog)
+            #expect(decision == .needsProfile(url: url, rule: rule, issue: .configUnavailable(.unsupportedVersion(3)),
+                                              explanation: URLClassifierTests.explanation(url)))
         }
     }
 }

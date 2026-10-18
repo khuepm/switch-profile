@@ -53,8 +53,8 @@ final class CoordinatorHarness {
     func bind(_ bindings: [RuleID: ProfileBinding]) throws {
         try config.update { config in
             config.seedPending = false
-            for rule in RuleID.allCases {
-                config.targets[rule].binding = bindings[rule]
+            for rule in config.ruleOrder {
+                config.setBinding(bindings[rule], for: rule)
             }
         }
     }
@@ -211,7 +211,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         h.opener.suspendedCalls = [1]
         h.coordinator.enqueue((1...3).map(Links.r4), source: .external)
         await h.opener.waitUntilCallStarted(1)
-        try h.config.update { $0.targets.R4.binding = b("Profile 8") }
+        try h.config.update { $0.setBinding(b("Profile 8"), for: .r4) }
         h.opener.resume(1)
         await h.coordinator.waitUntilIdle()
         #expect(h.opener.directories == ["Profile 7", "Profile 8", "Profile 8"])
@@ -388,7 +388,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let r2Item = try #require(h.pendingItem(Links.r2(2)))
 
         try h.coordinator.openAndRemember(id: target.id, directory: "Profile 7")
-        let saved = try #require(h.loadedConfig?.targets.R3.binding)
+        let saved = try #require(h.loadedConfig?.binding(for: .r3))
         #expect(saved == b("Profile 7"))
         #expect(saved.matchedBy == nil)
         #expect(ConfigStore(fileURL: h.file).load() == .loaded(try #require(h.loadedConfig)))
@@ -442,7 +442,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(throws: PendingActionError.catalogUnavailable(.noProfiles)) {
             try h.coordinator.openAndRemember(id: item.id, directory: "Default")
         }
-        #expect(h.loadedConfig?.targets.R3.binding == nil)
+        #expect(h.loadedConfig?.binding(for: .r3) == nil)
     }
 
     @Test func openAndRememberOnALaunchFailureIsNotApplicable() async throws {
@@ -552,7 +552,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(r3Item.kind == .needsProfile(.missing(b("Profile 99"))))
         #expect(r2Item.kind == .needsProfile(.unset))
 
-        try h.config.update { $0.targets.R3.binding = b("Profile 7") }
+        try h.config.update { $0.setBinding(b("Profile 7"), for: .r3) }
         h.coordinator.reroutePending(rule: .r3)
         await h.coordinator.waitUntilIdle()
 
@@ -574,7 +574,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(h.coordinator.pending.items.allSatisfy { $0.kind == .needsProfile(.unset) })
 
         try h.coordinator.updateBinding(rule: .r3, to: b("Profile 8"))
-        #expect(h.loadedConfig?.targets.R3.binding == b("Profile 8"))
+        #expect(h.loadedConfig?.binding(for: .r3) == b("Profile 8"))
         await h.coordinator.waitUntilIdle()
 
         #expect(h.opener.urls == urls.map(\.absoluteString))
@@ -594,7 +594,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         try h.coordinator.updateBinding(rule: .r3, to: nil)
         await h.coordinator.waitUntilIdle()
 
-        #expect(h.loadedConfig?.targets.R3.binding == nil)
+        #expect(h.loadedConfig?.binding(for: .r3) == nil)
         // Re-routing the R3 item would have turned it into `.unset`. (R4 is covered by
         // choosingLastActiveForR4ReroutesItsPendingLinks: nil there means last active.)
         #expect(h.coordinator.pending.items == before)
@@ -675,7 +675,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         }
 
         try h.coordinator.resetConfigToDefaults()
-        #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
+        #expect(h.loadedConfig?.binding(for: .r3)?.directory == "Default")
         await h.coordinator.waitUntilIdle()
         #expect(h.opener.directories == ["Default"])
         #expect(h.opener.urls == [Links.r3(1).absoluteString])
@@ -698,7 +698,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         h.loader.state = .loaded(Fixture.validCatalog())
         _ = h.coordinator.loadCatalog(reroutingBlocked: false)
         await h.coordinator.waitUntilIdle()
-        #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
+        #expect(h.loadedConfig?.binding(for: .r3)?.directory == "Default")
         #expect(h.coordinator.pending.items == [item])
         #expect(h.opener.callCount == 0)
 
@@ -739,9 +739,9 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         // Seeding happens only in ConfigController.resetToDefaults, after the coordinator's load.
         h.loader.seeds = false
         try h.coordinator.resetConfigToDefaults()
-        #expect(h.loadedConfig?.targets.R1.binding?.directory == "Profile 30")
-        #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
-        #expect(h.loadedConfig?.targets.R4.binding == nil)
+        #expect(h.loadedConfig?.binding(for: .r1)?.directory == "Profile 30")
+        #expect(h.loadedConfig?.binding(for: .r3)?.directory == "Default")
+        #expect(h.loadedConfig?.binding(for: .r4) == nil)
         await h.coordinator.waitUntilIdle()
         // The reset seeded R1 and R3, so both unset links open in seq order.
         #expect(h.opener.callCount == 2)
@@ -786,7 +786,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(h.opener.callCount == 0)
 
         try h.coordinator.updateBinding(rule: .r4, to: nil)
-        #expect(h.loadedConfig?.targets.R4.binding == nil)
+        #expect(h.loadedConfig?.binding(for: .r4) == nil)
         await h.coordinator.waitUntilIdle()
         #expect(h.opener.requests.map(\.arguments) == urls.map { [$0.absoluteString] })
         #expect(h.coordinator.pending.items.isEmpty)
@@ -849,5 +849,308 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         h.coordinator.markAlertsSeen()
         #expect(h.coordinator.unseenAlertCount == 0)
         #expect(h.opener.callCount == 1)
+    }
+}
+
+// MARK: #14: rule editing re-routes pending links
+
+private let r5 = RuleID(number: 5)
+
+private func hostDraft(_ host: String, binding: ProfileBinding? = nil) -> RuleDraft {
+    RuleDraft(matchType: .host, host: host, binding: binding)
+}
+
+@MainActor
+extension RoutingCoordinatorTests {
+    @Test func addRuleReroutesPendingLinksItNowMatches() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        // A fixed fallback whose profile is gone: example.com links wait.
+        try h.bind([.r4: b("Profile 99")])
+        h.enqueue(Links.r4(1), Links.r4(2))
+        await h.coordinator.waitUntilIdle()
+        let before = h.coordinator.pending.items
+        #expect(before.map(\.kind) == Array(repeating: .needsProfile(.missing(b("Profile 99"))), count: 2))
+
+        let added = try h.coordinator.addRule(hostDraft("example.com", binding: b("Default")))
+        #expect(added == r5)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.urls == [Links.r4(1).absoluteString, Links.r4(2).absoluteString])
+        #expect(h.opener.directories == ["Default", "Default"])
+        #expect(h.coordinator.pending.items.isEmpty)
+        #expect(h.coordinator.recent.first == .opened(host: "example.com", rule: r5, directory: "Default"))
+        #expect(h.loadedConfig?.ruleOrder == [.r1, .r2, .r3, r5, .fallback])
+    }
+
+    /// A new rule goes directly above the fallback, so a narrower rule for github.com only takes
+    /// effect once it is moved above R3; each step re-routes the waiting links.
+    @Test func addedRuleBelowABroaderRuleTakesEffectAfterMovingUp() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([.r1: b("Profile 30"), .r2: b("Profile 47")])
+        h.enqueue(Links.r3(1), Links.r3(2))
+        await h.coordinator.waitUntilIdle()
+        let before = h.coordinator.pending.items
+        #expect(before.map(\.kind) == [.needsProfile(.unset), .needsProfile(.unset)])
+
+        try h.coordinator.addRule(RuleDraft(matchType: .hostPathPrefix, host: "github.com", pathPrefix: "/khuepm",
+                                            binding: b("Default")))
+        await h.coordinator.waitUntilIdle()
+        #expect(h.loadedConfig.map(RuleAnalysis.issues) == [r5: .shadowed(by: .r3)])
+        #expect(h.opener.callCount == 0)
+        #expect(h.coordinator.pending.items.map(\.id) == before.map(\.id))
+
+        try h.coordinator.moveRule(id: r5, by: -1)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.loadedConfig?.ruleOrder == [.r1, .r2, r5, .r3, .fallback])
+        #expect(h.opener.urls == [Links.r3(1).absoluteString, Links.r3(2).absoluteString])
+        #expect(h.opener.directories == ["Default", "Default"])
+        #expect(h.coordinator.pending.items.isEmpty)
+    }
+
+    @Test func rerouteKeepsIdAndSeqWhenTheLinkStillCannotLaunch() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([:])
+        h.enqueue(Links.r3(1))
+        await h.coordinator.waitUntilIdle()
+        let before = try #require(h.coordinator.pending.items.first)
+
+        try h.coordinator.addRule(hostDraft("example.org"))
+        await h.coordinator.waitUntilIdle()
+        let after = try #require(h.coordinator.pending.items.first)
+        #expect(h.coordinator.pending.items.count == 1)
+        #expect(after.id == before.id)
+        #expect(after.seq == before.seq)
+        #expect(after.receivedAt == before.receivedAt)
+        #expect(after.rule == .r3)
+    }
+
+    @Test func editRuleReroutesPending() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([.r3: b("Default")])
+        h.enqueue(Links.r2(1))
+        await h.coordinator.waitUntilIdle()
+        #expect(h.pendingItem(Links.r2(1))?.kind == .needsProfile(.unset))
+
+        try h.coordinator.updateRule(id: .r2, draft: RuleDraft(matchType: .hostPathPrefix, host: "github.com", pathPrefix: "/other/repo"))
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.urls == [Links.r2(1).absoluteString])
+        #expect(h.opener.directories == ["Default"])
+        #expect(h.coordinator.recent.first == .opened(host: "github.com", rule: .r3, directory: "Default"))
+        #expect(h.coordinator.pending.items.isEmpty)
+        #expect(h.loadedConfig?.rule(.r2)?.identity == "khue@truckerpoints.ai")
+    }
+
+    @Test func deleteRuleReroutesItsPendingLinks() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([.r3: b("Default")])
+        h.enqueue(Links.r2(1), Links.r2(2))
+        await h.coordinator.waitUntilIdle()
+        #expect(h.coordinator.pending.items.count == 2)
+
+        try h.coordinator.deleteRule(id: .r2)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.urls == [Links.r2(1).absoluteString, Links.r2(2).absoluteString])
+        #expect(h.opener.directories == ["Default", "Default"])
+        #expect(h.coordinator.pending.items.isEmpty)
+        #expect(h.loadedConfig?.ruleOrder == [.r1, .r3, .fallback])
+    }
+
+    @Test func moveRuleReroutesPending() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([.r3: b("Default")])
+        h.enqueue(Links.r2(1))
+        await h.coordinator.waitUntilIdle()
+
+        try h.coordinator.moveRule(id: .r3, by: -1)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.loadedConfig?.ruleOrder == [.r1, .r3, .r2, .fallback])
+        #expect(h.opener.directories == ["Default"])
+        #expect(h.coordinator.recent.first == .opened(host: "github.com", rule: .r3, directory: "Default"))
+        #expect(h.coordinator.pending.items.isEmpty)
+    }
+
+    @Test func ruleChangeLeavesLaunchFailedAndCatalogUnavailableAlone() async throws {
+        let failed = try CoordinatorHarness()
+        defer { failed.cleanup() }
+        try failed.bind(allBound)
+        failed.opener.failingCalls = [1]
+        failed.enqueue(Links.r1(1))
+        await failed.coordinator.waitUntilIdle()
+        let failedItems = failed.coordinator.pending.items
+        #expect(failedItems.map(\.kind) == [.launchFailed(.openFailed("fake open failure"))])
+        try failed.coordinator.addRule(hostDraft("example.org"))
+        try failed.coordinator.moveRule(id: .r3, by: -1)
+        await failed.coordinator.waitUntilIdle()
+        #expect(failed.coordinator.pending.items == failedItems)
+        #expect(failed.opener.callCount == 1)
+
+        let unavailable = try CoordinatorHarness(catalog: .unavailable(.notFound("/x/Local State")))
+        defer { unavailable.cleanup() }
+        try unavailable.bind([.r3: b("Default")])
+        unavailable.enqueue(Links.r3(1))
+        await unavailable.coordinator.waitUntilIdle()
+        let unavailableItems = unavailable.coordinator.pending.items
+        #expect(unavailableItems.map(\.kind) == [.needsProfile(.catalogUnavailable(.notFound("/x/Local State")))])
+        try unavailable.coordinator.addRule(hostDraft("example.org"))
+        await unavailable.coordinator.waitUntilIdle()
+        #expect(unavailable.coordinator.pending.items == unavailableItems)
+        #expect(unavailable.opener.callCount == 0)
+    }
+
+    @Test func invalidDraftWritesAndReroutesNothing() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([:])
+        h.enqueue(Links.r3(1))
+        await h.coordinator.waitUntilIdle()
+        let before = h.coordinator.pending.items
+        let bytes = try Data(contentsOf: h.file)
+        let config = h.loadedConfig
+
+        #expect(throws: RuleEditError.invalid([.wildcardHost])) { try h.coordinator.addRule(hostDraft("*.github.com")) }
+        #expect(throws: RuleEditError.invalid([.duplicate(of: .r1)])) {
+            try h.coordinator.updateRule(id: .r3, draft: hostDraft("git.fis.vn"))
+        }
+        #expect(throws: RuleEditError.fallbackImmutable) { try h.coordinator.deleteRule(id: .fallback) }
+        #expect(throws: RuleEditError.ruleNotFound) { try h.coordinator.deleteRule(id: r5) }
+        #expect(throws: RuleEditError.cannotMove) { try h.coordinator.moveRule(id: .r1, by: -1) }
+        await h.coordinator.waitUntilIdle()
+        #expect(h.coordinator.pending.items == before)
+        #expect(try Data(contentsOf: h.file) == bytes)
+        #expect(h.loadedConfig == config)
+    }
+
+    @Test func ruleChangeWithConfigUnavailableThrowsAndReroutesNothing() async throws {
+        let h = try CoordinatorHarness(configFixture: "config-corrupt")
+        defer { h.cleanup() }
+        h.enqueue(Links.r4(1))
+        await h.coordinator.waitUntilIdle()
+        let before = h.coordinator.pending.items
+        guard before.count == 1, case .needsProfile(.configUnavailable)? = before.first?.kind else {
+            Issue.record("expected one configUnavailable item, got \(before)")
+            return
+        }
+        let bytes = try Data(contentsOf: h.file)
+
+        #expect(throws: RuleEditError.configUnavailable) { try h.coordinator.addRule(hostDraft("example.org")) }
+        #expect(throws: RuleEditError.configUnavailable) { try h.coordinator.updateRule(id: .r3, draft: hostDraft("example.org")) }
+        #expect(throws: RuleEditError.configUnavailable) { try h.coordinator.deleteRule(id: .r3) }
+        #expect(throws: RuleEditError.configUnavailable) { try h.coordinator.moveRule(id: .r3, by: -1) }
+        await h.coordinator.waitUntilIdle()
+        #expect(h.coordinator.pending.items == before)
+        #expect(h.opener.callCount == 0)
+        #expect(try Data(contentsOf: h.file) == bytes)
+    }
+
+    @Test func failedSaveReroutesNothing() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([.r3: b("Default")])
+        h.enqueue(Links.r2(1))
+        await h.coordinator.waitUntilIdle()
+        let before = h.coordinator.pending.items
+        let config = h.loadedConfig
+        // A read-only directory makes the atomic write fail.
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: h.dir.url.path)
+
+        do {
+            try h.coordinator.deleteRule(id: .r2)
+            Issue.record("expected the save to fail")
+        } catch {
+            guard case .saveFailed(.writeFailed) = error else {
+                Issue.record("expected .saveFailed(.writeFailed), got \(error)")
+                return
+            }
+        }
+        await h.coordinator.waitUntilIdle()
+        #expect(h.coordinator.pending.items == before)
+        #expect(h.opener.callCount == 0)
+        #expect(h.loadedConfig == config)
+    }
+
+    @Test func rulesPersistAcrossRelaunch() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([:])
+        try h.coordinator.addRule(RuleDraft(matchType: .hostPathPrefix, host: "GitHub.com", pathPrefix: "/Acme/App/",
+                                            binding: b("Profile 8")))
+        try h.coordinator.moveRule(id: r5, by: -1)
+        try h.coordinator.moveRule(id: r5, by: -1)
+        try h.coordinator.deleteRule(id: .r1)
+        try h.coordinator.updateRule(id: .r3, draft: hostDraft("gitlab.com"))
+
+        let relaunched = ConfigController(store: ConfigStore(fileURL: h.file))
+        relaunched.load()
+        guard case .loaded(let config) = relaunched.state else {
+            Issue.record("expected a loaded config, got \(relaunched.state)")
+            return
+        }
+        #expect(config == h.loadedConfig)
+        #expect(config.ruleOrder == [r5, .r2, .r3, .fallback])
+        #expect(config.rule(r5)?.match == .hostPathPrefix(host: "github.com", pathPrefix: "/Acme/App"))
+        #expect(config.binding(for: r5)?.directory == "Profile 8")
+        #expect(config.rule(.r3)?.match == .host("gitlab.com"))
+        #expect(config.nextRuleNumber == 6)
+
+        let decision = Router.decide(URL(string: "https://github.com/acme/app/pull/1")!, config: relaunched.routingConfig,
+                                     catalog: .loaded(Fixture.validCatalog()))
+        guard case .launch(let target, _) = decision else {
+            Issue.record("expected .launch, got \(decision)")
+            return
+        }
+        #expect(target.rule == r5)
+        #expect(target.directory == "Profile 8")
+    }
+
+    @Test func openAndRememberOnDeletedRuleIsNotApplicable() async throws {
+        let h = try CoordinatorHarness(catalog: .unavailable(.notFound("/x/Local State")))
+        defer { h.cleanup() }
+        try h.bind([.r2: b("Profile 47"), .r3: b("Default")])
+        h.enqueue(Links.r2(1))
+        await h.coordinator.waitUntilIdle()
+        let item = try #require(h.pendingItem(Links.r2(1)))
+        #expect(item.kind == .needsProfile(.catalogUnavailable(.notFound("/x/Local State"))))
+
+        try h.coordinator.deleteRule(id: .r2)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.coordinator.pending.items == [item])   // catalogUnavailable is left alone
+        let bytes = try Data(contentsOf: h.file)
+
+        h.loader.state = .loaded(Fixture.validCatalog())
+        #expect(throws: PendingActionError.notApplicable) { try h.coordinator.openAndRemember(id: item.id, directory: "Default") }
+        #expect(try Data(contentsOf: h.file) == bytes)
+        #expect(throws: ConfigError.writeFailed("rule R2 no longer exists")) {
+            try h.coordinator.updateBinding(rule: .r2, to: b("Default"))
+        }
+        #expect(try Data(contentsOf: h.file) == bytes)
+
+        // Retry classifies the link again with the current rules: it now matches R3.
+        try h.coordinator.retry(id: item.id)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.directories == ["Default"])
+        #expect(h.coordinator.recent.first == .opened(host: "github.com", rule: .r3, directory: "Default"))
+        #expect(h.coordinator.pending.items.isEmpty)
+    }
+
+    @Test func resetReroutesItemsOfRemovedRules() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([:])
+        try h.coordinator.addRule(hostDraft("example.com"))
+        h.enqueue(Links.r4(1))
+        await h.coordinator.waitUntilIdle()
+        #expect(h.pendingItem(Links.r4(1))?.rule == r5)
+        #expect(h.opener.callCount == 0)
+
+        try h.coordinator.resetConfigToDefaults()
+        await h.coordinator.waitUntilIdle()
+        #expect(h.loadedConfig?.ruleOrder == [.r1, .r2, .r3, .fallback])
+        #expect(h.opener.requests.map(\.arguments) == [[Links.r4(1).absoluteString]])   // last active Chrome profile
+        #expect(h.coordinator.pending.items.isEmpty)
     }
 }

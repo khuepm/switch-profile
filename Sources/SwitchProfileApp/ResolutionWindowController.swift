@@ -10,6 +10,8 @@ final class ResolutionModel: ObservableObject {
     @Published var selection: String?
     @Published private(set) var actionError: String?
     @Published private(set) var isConfigWritable = false
+    /// nil while the configuration is unavailable.
+    @Published private(set) var config: AppConfig?
 
     private let coordinator: RoutingCoordinator
     private let configController: ConfigController
@@ -38,6 +40,13 @@ final class ResolutionModel: ObservableObject {
         }
         items = coordinator.pending.items
         isConfigWritable = configController.isWritable
+        if case .loaded(let loaded) = configController.state { config = loaded } else { config = nil }
+    }
+
+    /// "Open and use" needs the item's rule to still exist (it may have been deleted in Settings).
+    func canRemember(_ item: PendingItem) -> Bool {
+        guard case .needsProfile = item.kind, isConfigWritable else { return false }
+        return config?.contains(item.rule) == true
     }
 
     func refreshProfiles() {

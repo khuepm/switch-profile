@@ -6,10 +6,16 @@ import Foundation
 /// binding (including a fixed fallback) is broken or cannot be checked.
 public enum Router {
     public static func decide(_ url: URL, config: RoutingConfig, catalog: CatalogState) -> RoutingDecision {
-        // 1. Classify.
+        // 1. Classify with the configured rules. Without a usable configuration the built-in
+        //    rules are used, so the decision names the rule that "Reset to defaults…" restores.
+        let rules: [RoutingRule]
+        switch config {
+        case .loaded(let loaded): rules = loaded.rules
+        case .unavailable: rules = AppConfig.defaultRules
+        }
         let rule: RuleID
         let explanation: String
-        switch URLClassifier.classify(url) {
+        switch URLClassifier.classify(url, rules: rules) {
         case .rejected(let rejection):
             return .rejected(url: url, rejection)
         case .matched(let matchedRule, let matchedExplanation):
@@ -27,7 +33,7 @@ public enum Router {
         }
 
         // 3.–6. Binding, catalog, directory, identity.
-        switch bindingStatus(rule: rule, appConfig.targets[rule].binding, catalog: catalog) {
+        switch bindingStatus(rule: rule, appConfig.binding(for: rule), catalog: catalog) {
         case .lastActiveChrome:
             return .launch(LaunchTarget(url: url, rule: rule, profile: .lastActiveChrome),
                            explanation: "\(rule.rawValue): last active Chrome profile (\(explanation))")
@@ -62,7 +68,7 @@ enum BindingStatus: Equatable, Sendable {
 func bindingStatus(rule: RuleID, _ binding: ProfileBinding?, catalog: CatalogState) -> BindingStatus {
     // 3. The fallback without a binding means "Last active Chrome profile"; it needs no catalog.
     //    Any other rule without a binding is unset.
-    if rule == .r4, binding == nil { return .lastActiveChrome }
+    if rule == .fallback, binding == nil { return .lastActiveChrome }
     guard let binding else { return .unset }
     // 4. The catalog must be available.
     let profiles: ProfileCatalog

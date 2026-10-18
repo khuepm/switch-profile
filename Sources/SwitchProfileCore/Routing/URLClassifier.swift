@@ -6,12 +6,8 @@ public enum URLClassifier {
     /// 512 KiB. The URL travels to Chrome as one argv element and `ARG_MAX` (argv + envp) is 1 MiB.
     public static let maxURLBytes = 524_288
 
-    static let fisGitLabHost = "git.fis.vn"
-    static let gitHubHost = "github.com"
-    static let truckerPointsOwner = "truckerpoints"
-    static let truckerPointsRepos: Set<String> = ["trucker-points", "trucker-points.git"]
-
-    public static func classify(_ url: URL) -> Classification {
+    /// `rules` are checked in order and the first match wins; no match is the fallback (`R4`).
+    public static func classify(_ url: URL, rules: [RoutingRule]) -> Classification {
         // 1. Length.
         guard url.absoluteString.utf8.count <= maxURLBytes else {
             return .rejected(.malformed(.tooLong))
@@ -33,40 +29,16 @@ public enum URLClassifier {
         guard let rawHost = components.host, !rawHost.isEmpty else {
             return .rejected(.malformed(.missingHost))
         }
-        var host = rawHost.lowercased()
-        if host.hasSuffix(".") {
-            host.removeLast()
-        }
+        let host = HostName.normalize(rawHost)
         guard !host.isEmpty else {
             return .rejected(.malformed(.missingHost))
         }
 
-        switch host {
-        case fisGitLabHost:
-            return .matched(.r1, explanation: "host \(fisGitLabHost)")
-        case gitHubHost:
-            if isTruckerPointsRepository(percentEncodedPath: components.percentEncodedPath) {
-                return .matched(.r2, explanation: "host \(gitHubHost), repository TruckerPoints/trucker-points")
-            }
-            return .matched(.r3, explanation: "host \(gitHubHost)")
-        default:
-            return .matched(.r4, explanation: "host \(host) matches no rule; fallback")
+        // 5. First matching rule in list order.
+        let path = components.percentEncodedPath
+        if let rule = rules.first(where: { $0.match.matches(host: host, percentEncodedPath: path) }) {
+            return .matched(rule.id, explanation: rule.match.summary)
         }
-    }
-
-    /// Segment 1 decodes to `truckerpoints` and segment 2 to `trucker-points` or `trucker-points.git`.
-    /// Splitting keeps empty pieces (segment 0 is the empty string before the leading `/`), so
-    /// `//TruckerPoints//…` does not match. Each segment is percent-decoded, then lowercased, then
-    /// compared as a whole (`.git` suffix compared case-insensitively, so `trucker-points.GIT` matches).
-    /// Anything after segment 2 is allowed. Query and fragment never take part.
-    private static func isTruckerPointsRepository(percentEncodedPath: String) -> Bool {
-        let segments = percentEncodedPath.components(separatedBy: "/")
-        guard segments.count >= 3,
-              let owner = segments[1].removingPercentEncoding?.lowercased(),
-              let repo = segments[2].removingPercentEncoding?.lowercased()
-        else {
-            return false
-        }
-        return owner == truckerPointsOwner && truckerPointsRepos.contains(repo)
+        return .matched(.fallback, explanation: "host \(host) matches no rule; fallback")
     }
 }

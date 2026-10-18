@@ -16,7 +16,7 @@ Người dùng đặt Switch Profile làm trình duyệt mặc định một l�
 
 ## Quy tắc demo
 
-Quy tắc theo repository được ưu tiên trước quy tắc chung theo tên miền.
+Đây là các quy tắc mặc định (R1–R4). Bạn có thể thêm, sửa, xóa và sắp xếp lại quy tắc trong Settings (xem **Quản lý quy tắc** bên dưới). Quy tắc được kiểm tra từ trên xuống: quy tắc theo repository trước, rồi đến quy tắc chung theo tên miền.
 
 | Điều kiện | Profile Chrome | Link nghiệm thu |
 | --- | --- | --- |
@@ -32,6 +32,7 @@ Tên miền được so khớp chính xác. Các tên miền con như `www.githu
 ## Giao diện
 
 - Trạng thái trình duyệt mặc định và hướng dẫn thiết lập.
+- Danh sách quy tắc có thứ tự: thêm, sửa, xóa và sắp xếp lại quy tắc.
 - Danh sách profile Chrome và lựa chọn profile cho từng quy tắc.
 - Lựa chọn dự phòng: profile Chrome dùng gần nhất hoặc một profile cố định.
 - Hướng xử lý rõ ràng khi profile đã cấu hình không còn tồn tại.
@@ -41,7 +42,7 @@ Tên hiển thị và địa chỉ email của profile không nhất thiết là
 ## Nội dung của v0.2.0
 
 1. Ứng dụng macOS bằng AppKit chạy trên thanh menu, nhận sự kiện mở URL HTTP/HTTPS.
-2. Quy tắc repository/tên miền với thứ tự rõ ràng, profile dự phòng và chống vòng lặp.
+2. Quy tắc repository/tên miền với thứ tự rõ ràng (sửa được trong Settings), profile dự phòng và chống vòng lặp.
 3. Menu trên thanh menu, cài đặt và ánh xạ profile. Kiểm tra định tuyến từ Terminal bằng `--dry-run`.
 4. Một `.app` cục bộ được build bằng một script, kèm hướng dẫn cài đặt và gỡ bỏ bên dưới.
 5. Kiểm thử tự động cho định tuyến, cấu hình và khởi chạy. Các bước kiểm tra thủ công (từng profile khi Chrome đang chạy và đã đóng, cùng ma trận end-to-end) được theo dõi trong [ma trận nghiệm thu](docs/ACCEPTANCE.md).
@@ -70,7 +71,7 @@ scripts/build-app.sh --install  # đồng thời chép vào ~/Applications/Switc
 <!-- sp:configuration -->
 ## Cấu hình ánh xạ profile
 
-Mở **Settings…** từ biểu tượng trên thanh menu. Mỗi quy tắc (R1 git.fis.vn, R2 trucker-points, R3 các link github.com khác, R4 dự phòng) có một Picker liệt kê các profile tìm thấy trong Chrome.
+Mở **Settings…** từ biểu tượng trên thanh menu. **Routing rules** liệt kê các quy tắc theo thứ tự kiểm tra, cuối cùng là dự phòng (R4). Mỗi quy tắc có một Picker liệt kê các profile tìm thấy trong Chrome. Mặc định gồm R1 git.fis.vn, R2 github.com/TruckerPoints/trucker-points và R3 github.com.
 
 - Ở lần chạy đầu, Switch Profile tự nhận diện profile cho R1–R3 theo danh tính trong bảng quy tắc. Các dòng đó hiện "Auto-detected: matched by …". Bấm **Confirm** để chấp nhận, hoặc chọn profile khác.
 - **Detect** tìm lại profile theo danh tính của quy tắc. Nếu có nhiều profile khớp, ứng dụng không tự chọn mà để bạn chọn.
@@ -79,7 +80,18 @@ Mở **Settings…** từ biểu tượng trên thanh menu. Mỗi quy tắc (R1 
 - Các ô nhập liệu hỗ trợ phím tắt chỉnh sửa chuẩn: Cmd+X, Cmd+C, Cmd+V, Cmd+A, Cmd+Z và Shift-Cmd-Z.
 - Profile bị mất hoặc tài khoản đã đổi được đánh dấu ở dòng tương ứng và trong menu ("Profile mapping needs attention …").
 
-Cấu hình được lưu tại `~/Library/Application Support/SwitchProfile/config.json`. Nếu tệp không hợp lệ, menu hiện "Configuration error – Reset to defaults…". Reset giữ lại bản sao lưu tên `config.corrupt-<ngày>.json`.
+### Quản lý quy tắc
+
+- **Add rule** (ngay trên dự phòng) mở trình chỉnh sửa: chọn **Match** (Exact host, hoặc Host and path prefix), nhập **Host** và, với tiền tố, **Path prefix**, có thể chọn **Profile**, rồi bấm **Save**. Quy tắc mới được thêm ngay trên dự phòng và nhận mã chưa dùng tiếp theo (R5, R6, …; mã không bao giờ được dùng lại).
+- **Edit** sửa điều kiện khớp của quy tắc; profile được đổi bằng Picker của dòng đó. **Delete…** hỏi xác nhận trước khi xóa. **Move up** / **Move down** đổi thứ tự.
+- Quy tắc được kiểm tra từ trên xuống và quy tắc khớp đầu tiên được dùng. Dự phòng luôn ở cuối, không sửa, di chuyển hay xóa được.
+- Exact host: tên miền phải trùng khớp (không phân biệt hoa thường, bỏ qua dấu chấm cuối, cổng và thông tin người dùng). Không hỗ trợ tên miền con hay ký tự đại diện (`*.github.com`): thêm từng tên miền thành một quy tắc riêng.
+- Host and path prefix: đường dẫn phải bắt đầu bằng tiền tố theo từng đoạn trọn vẹn, không phân biệt hoa thường. `/acme/app` khớp `/acme/app`, `/acme/app/pull/1` và `/acme/app.git`, nhưng không khớp `/acme/app-other`. Query và fragment không tham gia so khớp. Đường dẫn, query và fragment gốc luôn được chuyển nguyên vẹn.
+- Dữ liệu không hợp lệ được báo màu đỏ ngay dưới ô nhập: tên miền trống hoặc không hợp lệ (không có `http://`, đường dẫn, cổng hay khoảng trắng), đường dẫn không bắt đầu bằng `/`, hoặc quy tắc trùng với quy tắc khác.
+- Cảnh báo màu cam xuất hiện khi một quy tắc không bao giờ khớp vì quy tắc rộng hơn ở phía trên luôn thắng (ví dụ `github.com/acme` nằm dưới `github.com`). Hãy chuyển quy tắc hẹp hơn lên trên.
+- Thêm, sửa, xóa hoặc di chuyển quy tắc sẽ định tuyến lại các link đang chờ trong cửa sổ link đang chờ.
+
+Cấu hình được lưu tại `~/Library/Application Support/SwitchProfile/config.json` (schema phiên bản 2). Tệp của phiên bản cũ vẫn được đọc như cũ và được lưu theo định dạng mới ở lần thay đổi tiếp theo, với định tuyến không đổi. Nếu tệp không hợp lệ hoặc thuộc phiên bản mới hơn, tệp không bao giờ bị ghi đè: menu hiện "Configuration error – Reset to defaults…", và Reset giữ lại bản sao lưu tên `config.corrupt-<ngày>.json`.
 
 <!-- sp:default-browser -->
 ## Đặt làm trình duyệt mặc định
@@ -101,7 +113,7 @@ Bạn cũng có thể chọn trong System Settings → Desktop & Dock → Defaul
   build/SwitchProfile.app/Contents/MacOS/SwitchProfile --dry-run [--assume-chrome running|closed] URL...
   ```
 
-  Ở chế độ profile dùng gần nhất, dự phòng hiển thị `R4: last active Chrome profile` và argv không có `--profile-directory`.
+  Lệnh dùng các quy tắc của bạn trong `config.json` và in chúng theo thứ tự trên dòng `rules:`. Ở chế độ profile dùng gần nhất, dự phòng hiển thị `R4: last active Chrome profile` và argv không có `--profile-directory`.
 
 <!-- sp:restore -->
 ## Khôi phục trình duyệt mặc định trước đó
@@ -138,6 +150,7 @@ Khi đặt Switch Profile làm mặc định, ứng dụng ghi lại trình duy�
 - Ứng dụng dùng trình duyệt tích hợp, hoặc mở thẳng một trình duyệt cụ thể, sẽ bỏ qua Switch Profile.
 - Việc link mở trong tab mới hay cửa sổ mới do Chrome quyết định.
 - Hiện chỉ hỗ trợ Google Chrome.
+- Quy tắc chỉ khớp tên miền chính xác; không có quy tắc ký tự đại diện hay tên miền con.
 
 ## Tiêu chí nghiệm thu
 

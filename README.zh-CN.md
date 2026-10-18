@@ -16,7 +16,7 @@
 
 ## 演示规则
 
-仓库级规则优先于通用域名规则。
+以下是默认规则（R1–R4）。你可以在 Settings 中添加、编辑、删除和调整规则顺序（见下文“管理规则”）。规则从上到下依次检查：先是仓库级规则，再是通用域名规则。
 
 | 匹配条件 | Chrome 配置文件 | 验收链接 |
 | --- | --- | --- |
@@ -32,6 +32,7 @@
 ## 界面
 
 - 默认浏览器状态及设置说明。
+- 有序的规则列表：添加、编辑、删除和调整规则顺序。
 - 已检测到的 Chrome 配置文件，以及各规则的配置文件选择器。
 - 备用选择器：最近使用的 Chrome 配置文件或固定的配置文件。
 - 配置文件不存在时的明确恢复选项。
@@ -41,7 +42,7 @@
 ## v0.2.0 包含的内容
 
 1. 基于 AppKit 的原生 macOS 菜单栏应用，接收 HTTP/HTTPS URL 打开事件。
-2. 顺序明确的仓库和域名规则、备用路由及循环防护。
+2. 顺序明确的仓库和域名规则（可在 Settings 中编辑）、备用路由及循环防护。
 3. 菜单栏入口、设置和配置文件映射。路由可在终端中用 `--dry-run` 检查。
 4. 由一个脚本构建的本地 `.app`，安装与卸载说明见下文。
 5. 覆盖路由、配置和启动的自动化测试。手动检查（Chrome 正在运行及已关闭时逐个验证三个配置文件，以及端到端矩阵）记录在[验收矩阵](docs/ACCEPTANCE.md)中。
@@ -70,7 +71,7 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
 <!-- sp:configuration -->
 ## 配置文件映射
 
-从菜单栏图标打开 **Settings…**。每条规则（R1 git.fis.vn、R2 trucker-points、R3 其他 github.com 链接、R4 备用）都有一个列出 Chrome 中已找到配置文件的选择器。
+从菜单栏图标打开 **Settings…**。**Routing rules** 按检查顺序列出规则，最后是备用（R4）。每条规则都有一个列出 Chrome 中已找到配置文件的选择器。默认规则为 R1 git.fis.vn、R2 github.com/TruckerPoints/trucker-points 和 R3 github.com。
 
 - 首次运行时，Switch Profile 会根据规则表中的身份为 R1–R3 自动识别配置文件，这些行显示 "Auto-detected: matched by …"。点击 **Confirm** 确认，或选择其他配置文件。
 - **Detect** 按规则的身份重新查找。如果匹配到多个配置文件，应用不会自动选择，而是由你选择。
@@ -79,7 +80,18 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
 - 文本框支持标准编辑快捷键：Cmd+X、Cmd+C、Cmd+V、Cmd+A、Cmd+Z 和 Shift-Cmd-Z。
 - 配置文件缺失或账号变更时，会在对应行和菜单中标记（"Profile mapping needs attention …"）。
 
-配置保存在 `~/Library/Application Support/SwitchProfile/config.json`。若文件无效，菜单显示 "Configuration error – Reset to defaults…"。重置时会保留名为 `config.corrupt-<日期>.json` 的备份。
+### 管理规则
+
+- **Add rule**（位于备用上方）打开编辑器：选择 **Match**（Exact host，或 Host and path prefix），输入 **Host**，前缀规则还需输入 **Path prefix**，可选择 **Profile**，然后点击 **Save**。新规则添加在备用正上方，并获得下一个未使用的编号（R5、R6……；编号不会被重复使用）。
+- **Edit** 修改规则的匹配条件；配置文件通过该行的选择器修改。**Delete…** 会先请求确认。**Move up** / **Move down** 调整顺序。
+- 规则从上到下检查，使用第一条匹配的规则。备用始终在最后，不能编辑、移动或删除。
+- Exact host：主机名必须相同（不区分大小写，忽略末尾的点、端口和用户信息）。不支持子域名和通配符（`*.github.com`）：请将每个主机名单独添加为一条规则。
+- Host and path prefix：路径必须按完整路径段以该前缀开头，不区分大小写。`/acme/app` 匹配 `/acme/app`、`/acme/app/pull/1` 和 `/acme/app.git`，但不匹配 `/acme/app-other`。查询参数和片段不参与匹配。原始路径、查询参数和片段始终原样转发。
+- 无效输入会以红色显示在对应输入框下方：主机名为空或无效（不能包含 `http://`、路径、端口或空格）、路径不以 `/` 开头，或与其他规则重复。
+- 如果某条规则因上方更宽泛的规则总是先匹配而永远不会生效（例如 `github.com/acme` 位于 `github.com` 下方），会显示橙色警告。请将更具体的规则上移。
+- 添加、编辑、删除或移动规则后，待处理链接窗口中的链接会重新路由。
+
+配置保存在 `~/Library/Application Support/SwitchProfile/config.json`（架构版本 2）。旧版本的文件会照常读取，并在下次更改时以新格式保存，路由结果不变。若文件无效或来自更新的版本，则绝不会被覆盖：菜单显示 "Configuration error – Reset to defaults…"，重置时会保留名为 `config.corrupt-<日期>.json` 的备份。
 
 <!-- sp:default-browser -->
 ## 设为默认浏览器
@@ -101,7 +113,7 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
   build/SwitchProfile.app/Contents/MacOS/SwitchProfile --dry-run [--assume-chrome running|closed] URL...
   ```
 
-  在最近使用模式下，备用显示 `R4: last active Chrome profile`，argv 中没有 `--profile-directory`。
+  试运行使用 `config.json` 中你的规则，并在 `rules:` 行中按顺序列出。在最近使用模式下，备用显示 `R4: last active Chrome profile`，argv 中没有 `--profile-directory`。
 
 <!-- sp:restore -->
 ## 恢复之前的默认浏览器
@@ -138,6 +150,7 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
 - 使用内置浏览器的应用，或直接打开特定浏览器的应用，会绕过 Switch Profile。
 - 链接在新标签页还是新窗口中打开由 Chrome 决定。
 - 目前仅支持 Google Chrome。
+- 规则仅精确匹配主机名，不支持通配符或子域名规则。
 
 ## 验收标准
 

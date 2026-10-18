@@ -15,8 +15,8 @@ public enum ConfigValidator {
     /// Same checks as router steps 3 to 6, through the shared `bindingStatus`.
     public static func status(config: AppConfig, catalog: CatalogState) -> [RuleID: TargetStatus] {
         var result: [RuleID: TargetStatus] = [:]
-        for rule in RuleID.allCases {
-            switch bindingStatus(rule: rule, config.targets[rule].binding, catalog: catalog) {
+        for rule in config.ruleOrder {
+            switch bindingStatus(rule: rule, config.binding(for: rule), catalog: catalog) {
             case .ok(let binding, let profile):
                 result[rule] = .ok(profile, autoDetected: binding.matchedBy)
             case .lastActiveChrome:
@@ -48,14 +48,15 @@ public enum ConfigValidator {
         }
     }
 
-    /// Rules whose binding is broken: exactly the .missing and .identityMismatch statuses, sorted R1…R4.
-    /// .unset (normal on first run), .lastActiveChrome, .ok and .catalogUnavailable never count.
-    public static func needsAttention(_ statuses: [RuleID: TargetStatus]) -> [RuleID] {
-        statuses.compactMap { rule, status in
-            switch status {
-            case .missing, .identityMismatch: rule
-            case .ok, .lastActiveChrome, .unset, .catalogUnavailable: nil
+    /// Rules whose binding is broken: exactly the .missing and .identityMismatch statuses, in `order`
+    /// (the configuration's evaluation order). .unset (normal on first run), .lastActiveChrome, .ok and
+    /// .catalogUnavailable never count.
+    public static func needsAttention(_ statuses: [RuleID: TargetStatus], order: [RuleID]) -> [RuleID] {
+        order.filter { rule in
+            switch statuses[rule] {
+            case .missing?, .identityMismatch?: true
+            case .ok?, .lastActiveChrome?, .unset?, .catalogUnavailable?, nil: false
             }
-        }.sorted()
+        }
     }
 }

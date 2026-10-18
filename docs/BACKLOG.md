@@ -23,6 +23,8 @@ P0 means required for correct routing or its verification. P1 means required for
 
 ## Rule contract
 
+Items 2–4 are the default rules (R1–R3). Since [#14](https://github.com/khuepm/switch-profile/issues/14) users can add, edit, delete and reorder rules in Settings (exact host, or host plus path prefix on whole segments); the defaults are restored by "Reset to defaults…".
+
 1. Accept HTTP/HTTPS URLs and match their parsed hostname.
 2. On `github.com`, match owner `TruckerPoints` and repository `trucker-points` as complete path segments, case-insensitively. Route the repository root and descendants to `khue@truckerpoints.ai` before considering the general GitHub rule.
 3. Route every path on exact host `git.fis.vn` to `khuepm18`.
@@ -53,4 +55,4 @@ Completing the documentation setup closes only #2. The epic and implementation i
 
 ## Follow-up scope
 
-Additional browsers, a general rule editor, organization-wide rules, signing/notarization for wider distribution and automatic updates are outside the first local demo. The initial 2–3 developer-day estimate is provisional until profile-launch behavior has been verified.
+Additional browsers, organization-wide rules, signing/notarization for wider distribution and automatic updates are outside the first local demo. Rule editing for exact hosts and host plus path prefix shipped in #14; wildcard and subdomain matching remain out of scope. The initial 2–3 developer-day estimate is provisional until profile-launch behavior has been verified.

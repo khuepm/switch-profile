@@ -34,7 +34,7 @@ Suites are in `Tests/SwitchProfileCoreTests/` and `Tests/SwitchProfileUITests/`.
 | AC-9 | `https://example.com/?u=https://github.com/TruckerPoints/trucker-points` → R4 | automated-pass | `URLClassifierTests.matchesR4(_:)` |
 | AC-10 | `https://git.fis.vn.example.org/` and `https://notgithub.com/` → R4 | automated-pass | `URLClassifierTests.matchesR4(_:)` |
 | AC-11 | The URL passed to the launcher equals the received URL, query and fragment included | automated-pass | `RouterTests.forwardedURLIsTheReceivedAbsoluteString(_:)` (every accepted vector, through `ChromeLauncher.makeRequest`); `RouterTests.queryAndFragmentAreForwardedLiterally`; `RouterTests.launchCarriesTheOriginalURLObject`; `URLClassifierTests.classificationNeverAltersTheURL` |
-| AC-12 | No fallback configured: an R4 URL launches in the last active Chrome profile (argv without `--profile-directory`). Superseded by #13; it used to give an "unset fallback" decision | automated-pass | `RouterTests.unsetFallbackLaunchesInLastActiveChrome`; `RouterTests.unsetFallbackLaunchesEvenWithCatalogUnavailable(_:)`; `RouterTests.brokenFixedFallbackNeverDropsToLastActive`; `RouterTests.configUnavailableStillRefusesTheFallback`; `RouterTests.ruleMatchedLinksKeepTheirProfilesWithFallbackUnset`; `RouterTests.unsetRuleNeverFallsBack`; `RoutingCoordinatorTests.unsetFallbackLaunchesInLastActiveChromeWithoutPending`; `RoutingCoordinatorTests.unsetFallbackLaunchesWhileCatalogUnavailable`; `RoutingCoordinatorTests.choosingLastActiveForR4ReroutesItsPendingLinks`; `RoutingCoordinatorTests.burstWithLastActiveFallbackKeepsOrder`; `DryRunReportTests.lastActiveWithChromeRunning`; `DryRunReportTests.lastActiveWithChromeClosed`; `DryRunReportTests.lastActiveArgvHasNoProfileDirectory`; `FallbackMigrationTests` (unset R4 `{}` and `"binding": null` load as last active without a write; fixed fallbacks kept; schema version stays 1) |
+| AC-12 | No fallback configured: an R4 URL launches in the last active Chrome profile (argv without `--profile-directory`). Superseded by #13; it used to give an "unset fallback" decision | automated-pass | `RouterTests.unsetFallbackLaunchesInLastActiveChrome`; `RouterTests.unsetFallbackLaunchesEvenWithCatalogUnavailable(_:)`; `RouterTests.brokenFixedFallbackNeverDropsToLastActive`; `RouterTests.configUnavailableStillRefusesTheFallback`; `RouterTests.ruleMatchedLinksKeepTheirProfilesWithFallbackUnset`; `RouterTests.unsetRuleNeverFallsBack`; `RoutingCoordinatorTests.unsetFallbackLaunchesInLastActiveChromeWithoutPending`; `RoutingCoordinatorTests.unsetFallbackLaunchesWhileCatalogUnavailable`; `RoutingCoordinatorTests.choosingLastActiveForR4ReroutesItsPendingLinks`; `RoutingCoordinatorTests.burstWithLastActiveFallbackKeepsOrder`; `DryRunReportTests.lastActiveWithChromeRunning`; `DryRunReportTests.lastActiveWithChromeClosed`; `DryRunReportTests.lastActiveArgvHasNoProfileDirectory`; `FallbackMigrationTests` (unset R4 `{}` and `"binding": null` load as last active without a write; fixed fallbacks kept). #13 kept schema version 1; #14 migrates version 1 files to version 2 in memory, see RM-2 |
 | AC-13 | A rule whose profile is missing gives "missing profile", no launch elsewhere, no fallback launch | automated-pass | `RouterTests.missingDirectoryNeverLaunchesEvenWithFallbackBound` |
 | AC-14 | `ftp:`, `file:`, `mailto:`, `javascript:` are rejected and never launch | automated-pass | `URLClassifierTests.rejectsUnsupportedScheme(_:_:)`; `RouterTests.rejectedNeverLaunches(_:)`; `RouterTests.rejectionWinsOverUnavailableConfig` |
 | AC-15 | Rule evaluation runs without AppKit, Chrome or file access | automated-pass | `URLClassifierTests` and `RouterTests` run on in-memory values only; `SourceInvariantTests.coreImportsNoUIFramework` |
@@ -63,6 +63,23 @@ Suites are in `Tests/SwitchProfileCoreTests/` and `Tests/SwitchProfileUITests/`.
 | AC-38 | `swift test` passes | automated-pass | `swift test`: all suites pass, `DocsParityTests` included. |
 | AC-39 | All three READMEs have equivalent build/install, mapping, default-browser, troubleshooting, restore, removal, version, minimum macOS and signing sections | automated-pass | `DocsParityTests` checks that `README.md`, `README.vi.md` and `README.zh-CN.md` each contain the ten `<!-- sp:… -->` section markers exactly once, in the same order. |
 | AC-40 | The matrix (AC-33 to AC-35) was run against the packaged `.app` | manual-pending | Run every matrix row against `~/Applications/SwitchProfile.app` installed by `scripts/build-app.sh --install`. |
+
+## Rule management (#14)
+
+Issue [#14](https://github.com/khuepm/switch-profile/issues/14) makes the rule list editable. Rows that need the Settings window are `manual-pending`; their logic is covered by the tests listed.
+
+| Row | Criterion | Status | Evidence or manual steps |
+| --- | --- | --- | --- |
+| RM-1 | Add, edit, delete and reorder rules from Settings; changes persist across relaunch | manual-pending | Rows S-15, S-16. Logic tests: `RuleEditorTests` (all); `RoutingCoordinatorTests.rulesPersistAcrossRelaunch`; `ConfigMigrationTests.v2SurvivesRelaunch`, `v2ValidFixtureLoads`; `RuleEditorTests.editedConfigRoundTripsThroughJSON` |
+| RM-2 | R1–R3 and their bindings migrate into editable rules with no change in routing | automated-pass | `ConfigMigrationTests.v1ValidMigratesToEquivalentRules`, `v1FixedFallbackMigrates`, `migrationDoesNotWrite`, `migratedRoutingIsIdentical`, `firstUpdateWritesV2`, `unseededDefaultEqualsMigratedV1Default`; every `URLClassifierTests` vector classified with the built-in rules; the #14 dry-run evidence below (v1 file, checksum unchanged) |
+| RM-3 | Input is validated before saving (empty or invalid host, path not starting with `/`, duplicate); errors are shown on the row | manual-pending | Row S-17. Logic tests: `RuleValidatorTests` (all); `RuleEditorTests.invalidAddThrowsAndChangesNothing`, `invalidUpdateThrowsAndChangesNothing`; `RoutingCoordinatorTests.invalidDraftWritesAndReroutesNothing` |
+| RM-4 | A rule below a broader rule that always wins shows a warning | manual-pending | Row S-18. Logic tests: `RuleAnalysisTests` (all); `RoutingCoordinatorTests.addedRuleBelowABroaderRuleTakesEffectAfterMovingUp` |
+| RM-5 | Hosts match exactly and case-insensitively; path prefixes keep segment-boundary and case rules; path, query and fragment are forwarded unchanged | automated-pass | `RuleMatchTests` (all, including `userRuleLaunchesWithItsProfileAndTheUnchangedURL`); `RuleValidatorTests.idnHostsAreStoredAsTheClassifierSeesThem`; `RouterTests.userRuleAboveR3Wins`, `deletedDefaultRuleFallsThrough` |
+| RM-6 | Pending links of an edited or newly added rule are re-routed, as when fixing a binding | automated-pass | `RoutingCoordinatorTests.addRuleReroutesPendingLinksItNowMatches`, `rerouteKeepsIdAndSeqWhenTheLinkStillCannotLaunch`, `editRuleReroutesPending`, `deleteRuleReroutesItsPendingLinks`, `moveRuleReroutesPending`, `ruleChangeLeavesLaunchFailedAndCatalogUnavailableAlone`, `ruleChangeWithConfigUnavailableThrowsAndReroutesNothing`, `failedSaveReroutesNothing`, `openAndRememberOnDeletedRuleIsNotApplicable`, `resetReroutesItemsOfRemovedRules` |
+| RM-7 | `--dry-run` uses the user's rules | automated-pass | `DryRunReportTests.rulesNoteListsEvaluationOrder`, `rulesNoteForUnavailableConfig`, `prefixRuleExplanationInDecisionLine`; `SourceInvariantTests.dryRunIsSynchronousAndReadOnly(_:)`; the #14 dry-run evidence below (`config-v2-valid.json`: R5 before R3, `https://example.org/x?q=1#f` → R5) |
+| RM-8 | Unit tests cover CRUD, ordering, validation, migration and routing with user rules; the READMEs document rule management | automated-pass | The suites above; `swift test` passes. "Manage rules" in `README.md`, `README.vi.md`, `README.zh-CN.md` (inside `<!-- sp:configuration -->`); `DocsParityTests` |
+
+Corrupt or newer configuration files are never overwritten: `ConfigMigrationTests.invalidV1FilesStayCorruptAndUntouched(_:)`, `newerVersionIsNeverOverwritten`, `corruptV2IsNeverOverwritten`, `v2DecodeRejects(_:)`, `resetFromCorruptV2BacksUpAndWritesV2Defaults`; `FallbackMigrationTests.newerSchemaVersionIsRefused`; `ConfigStoreTests.versionProbeRunsFirst`. The version 0.2.0 app reads a version 2 file as `unsupportedVersion(2)` and does not write it either.
 
 ## Prerequisite (manual-pending)
 
@@ -153,6 +170,31 @@ equivalent (display only, never executed): open -na '/Applications/Google Chrome
 ```
 
 With `--assume-chrome closed` only the state line differs: `chrome-state: closed, cold start in Chrome's last used profile (profile.last_used in Local State); waits up to 5 s for isFinishedLaunching before the next URL`. With `--local-state Tests/SwitchProfileCoreTests/Fixtures/local-state-valid.json` and the same absent config, the five sample URLs give R1 `Profile 30`, R2 `Profile 47`, R3 `Default` (twice, including `trucker-points-other`) with `--profile-directory`, and R4 last active with argv `["https://example.com/"]`. With `--config Tests/SwitchProfileCoreTests/Fixtures/config-v1-fixed-fallback.json`, the fixed fallback is kept: argv `["--profile-directory=Profile 8","https://example.com/"]`. Neither `/tmp/sp13-absent.json` nor any change under `~/Library/Application Support/SwitchProfile` resulted.
+
+User rules (#14). Since #14 the explanation for R2 reads `host github.com, path /TruckerPoints/trucker-points` (the #12 block above shows the earlier `repository TruckerPoints/trucker-points` wording) and a `rules:` line lists the rules in evaluation order. The packaged binary was run with `--dry-run --assume-chrome running --local-state Tests/SwitchProfileCoreTests/Fixtures/local-state-valid.json` and a temporary copy of each config fixture; `shasum` of every copy was the same before and after, and the copies were removed afterwards.
+
+With `config-v1-valid.json` (schema version 1, migrated in memory) and the five sample URLs, it exited 2 (R3 has no binding in the fixture):
+
+```text
+config: /tmp/sp14-dry.P2HSxF/v1.json (loaded)
+rules: R1 host git.fis.vn; R2 host github.com, path /TruckerPoints/trucker-points; R3 host github.com; R4 fallback
+decision: launch, R1: host git.fis.vn, profile Profile 30
+decision: launch, R2: host github.com, path /TruckerPoints/trucker-points, profile Profile 47
+decision: needs profile, R3 has no profile set (host github.com)
+decision: needs profile, R3 has no profile set (host github.com)
+decision: launch, R4: last active Chrome profile (host example.com matches no rule; fallback)
+argv: ["https://example.com/"]
+```
+
+The `trucker-points-other` URL is the third decision (R3). With `config-v2-valid.json` (user rule R5 `example.org` between R2 and R3) and the same URLs plus `https://example.org/x?q=1#f`, the sample decisions were identical and the extra URL gave:
+
+```text
+rules: R1 host git.fis.vn; R2 host github.com, path /TruckerPoints/trucker-points; R5 host example.org; R3 host github.com; R4 fallback
+decision: launch, R5: host example.org, profile Profile 8
+argv: ["--profile-directory=Profile 8","https://example.org/x?q=1#f"]
+```
+
+With `config-v3.json` the config line was `(unavailable: unsupportedVersion(3))`, the rules line `rules: built-in defaults (configuration unavailable)`, and every decision `needs profile, R<n> configuration unavailable: unsupportedVersion(3)` with R1, R2, R3, R3, R4. With `config-v2-corrupt.json` the config line was `(unavailable: corrupt("type mismatch at 'rules.Index 0': …"))`. With the real `Local State` (33 profiles) and the user's own `config.json` (schema version 1, read only, checksum unchanged), it exited 0: R1 `Profile 30`, R2 `Profile 47`, R3 `Default` for `trucker-points-other` and LumiBase, and R4 with the user's fixed fallback.
 
 ## Manual matrix (manual-pending)
 
@@ -261,15 +303,20 @@ Note on "Refresh profiles": in the pending window, "Refresh profiles" reloads Ch
 | S-8 | Identity mismatch | Set R1's `binding.email` in `config.json` to `other@example.com`, relaunch | The row says the profile was bound to other@example.com and is now another account; the Picker shows "<dir> (account changed)"; "Use '<name>' (now <email>)" rewrites the binding and the row turns ✓ | | |
 | S-9 | First-run auto-detect | Delete `config.json`, relaunch | Seeded rows show "Auto-detected: matched by …"; "Confirm" clears the note | | |
 | S-10 | Corrupt config | Write `{` to `config.json`, relaunch | Menu shows "Configuration error – Reset to defaults…"; Settings rows are disabled with the Reset hint; the pending window has no "Open and use"; after quitting, the file is still `{` | | |
-| S-11 | Edit shortcuts on the packaged app (#12) | Open Settings. Select a Detect message with the mouse, press Cmd+A then Cmd+C, and paste into TextEdit. Once #14 adds a Settings text field: Cmd+V pastes a URL into it, Cmd+X, Cmd+Z and Shift-Cmd-Z work, and right-click shows Cut/Copy/Paste | The copied text matches; the field shortcuts work. Logic tests: `MainMenuTests.editMenuHasStandardKeyEquivalents(_:)`, `MainMenuTests.installSetsTheApplicationMainMenu`, `SourceInvariantTests.appDelegateInstallsTheMainMenu` | | |
+| S-11 | Edit shortcuts on the packaged app (#12) | Open Settings. Select a Detect message with the mouse, press Cmd+A then Cmd+C, and paste into TextEdit. Then press **Add rule** (#14): Cmd+V pastes a copied host into the Host field, Cmd+X, Cmd+Z and Shift-Cmd-Z work, and right-click shows Cut/Copy/Paste (see also S-19) | The copied text matches; the field shortcuts work. Logic tests: `MainMenuTests.editMenuHasStandardKeyEquivalents(_:)`, `MainMenuTests.installSetsTheApplicationMainMenu`, `SourceInvariantTests.appDelegateInstallsTheMainMenu` | | |
 | S-12 | No routing preview in Settings (#12, AC-32) | Open Settings | No "Test a link" section, no "Check rule" or "Open test link"; the default browser, Chrome profiles and routing rules sections are unchanged | | |
 | S-13 | Unreadable `Local State` in Settings (#12) | With access to `Local State` denied (see Environment note), open Settings | The header says "Chrome profiles unavailable: could not read … (…)" with the hint to allow Switch Profile in System Settings → Privacy & Security (App Data or Full Disk Access) and press Refresh; unset R1–R3 rows say "Chrome profiles unavailable – see above", never "Not set – choose a profile" | | |
 | S-14 | Settings fallback default (#13) | With R4 unset (fresh install or Reset to defaults…), open Settings | The R4 Picker shows "Last active Chrome profile" selected, with "Opens in the Chrome profile you used last, like Chrome without Switch Profile"; choosing it again after a fixed profile saves R4 without a binding | | |
+| S-15 | Rule changes persist (#14, RM-1) | In Settings, **Add rule** `example.org` with a profile, **Edit** R3 to `gitlab.com`, **Move up** the new rule twice, **Delete…** R1. Quit from the menu and relaunch | Settings shows the same rules in the same order (R5 first, no R1), with the same profiles; `--dry-run` prints the same `rules:` line | | |
+| S-16 | Delete confirmation and fixed fallback (#14, RM-1) | Press **Delete…** on a rule, then Cancel; press it again, then Delete | An alert "Delete rule R…?" appears; Cancel keeps the rule, Delete removes it. The R4 fallback row has no Edit, Move or Delete buttons; Move up is disabled on the first rule, Move down on the last rule above the fallback | | |
+| S-17 | Per-row validation (#14, RM-3) | **Add rule**, Save with an empty host; enter `https://github.com`; choose Host and path prefix and enter `owner/repo`; enter `git.fis.vn` as an exact host | Red errors appear under the field in that row ("Enter a host…", "Enter a host name only…", "The path prefix must start with /", "Same as R1 …"); they update while typing; nothing is saved until the input is valid | | |
+| S-18 | Shadowing warning (#14, RM-4) | Move R2 below R3 | The R2 row shows an orange "Never matches: R3 (github.com (any path)) is above and always matches first. Move this rule above it."; moving R2 back up removes it | | |
+| S-19 | Paste into rule fields (#14, #12) | Copy `github.com` and `/TruckerPoints/trucker-points` from TextEdit; in the rule editor press Cmd+V in Host and in Path prefix | Both fields receive the pasted text | | |
 
 ## Known limitations
 
 - Apps with an embedded browser, and apps that open a specific browser directly, never hand the link to the default browser. They bypass Switch Profile. These cases are not claimed.
-- Hosts are matched exactly. `www.github.com`, `api.github.com`, `gist.github.com` and subdomains of `git.fis.vn` go to the fallback rule.
+- Hosts are matched exactly. `www.github.com`, `api.github.com`, `gist.github.com` and subdomains of `git.fis.vn` go to the fallback rule. User rules (#14) are exact host or host plus path prefix; there are no wildcard or subdomain rules.
 - Whether a link opens as a tab or a new window is Chrome's choice. It is recorded as observed, not guaranteed.
 - Switch Profile sees only whether Chrome accepted the launch request. A failure inside Chrome after that (for example a profile that fails to load) is not observable.
 - The app is ad-hoc signed and not notarized, so Gatekeeper may ask for confirmation on first open.

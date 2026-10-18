@@ -23,7 +23,7 @@ struct ResolutionView: View {
             .textSelection(.enabled)
             .lineLimit(4)
             .truncationMode(.middle)
-        Text("\(head.rule.rawValue) (\(UIText.ruleDescription(head.rule))): \(UIText.pendingKind(head.kind, rule: head.rule))")
+        Text("\(head.rule.rawValue) (\(UIText.ruleDescription(head.rule, config: model.config))): \(UIText.pendingKind(head.kind, rule: head.rule))")
             .foregroundStyle(.secondary)
 
         HStack {
@@ -47,8 +47,8 @@ struct ResolutionView: View {
         HStack {
             Button("Open once") { model.openOnce() }
                 .disabled(model.selection == nil)
-            if case .needsProfile = head.kind, model.isConfigWritable {
-                Button(head.rule == .r4 ? "Open and use as fallback" : "Open and use for \(head.rule.rawValue)") {
+            if model.canRemember(head) {
+                Button(head.rule == .fallback ? "Open and use as fallback" : "Open and use for \(head.rule.rawValue)") {
                     model.openAndRemember()
                 }
                 .disabled(model.selection == nil)

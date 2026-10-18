@@ -1,8 +1,20 @@
 import AppKit
 import SwitchProfileCore
 
+/// The inline rule editor's fields.
+struct RuleDraftState: Equatable {
+    /// nil while adding a new rule.
+    var editing: RuleID?
+    var matchType: RuleMatchType
+    var host: String
+    var pathPrefix: String
+    /// Profile for a new rule (nil: not set). Editing keeps the row's profile picker instead.
+    var directory: String?
+}
+
 /// State and actions of the Settings window. All decisions are delegated to Core; every binding
-/// write goes through `RoutingCoordinator.updateBinding(rule:to:)`, so the rule's pending links re-route.
+/// write goes through `RoutingCoordinator.updateBinding(rule:to:)`, and every rule add, edit, delete
+/// or move through the coordinator's rule operations, so pending links re-route.
 @MainActor
 final class SettingsModel: ObservableObject {
     @Published private(set) var configState: ConfigState
@@ -15,12 +27,25 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var recordMessage: String?
     @Published private(set) var isAwaitingConfirmation = false
     @Published private(set) var configMessage: String?
+    /// Duplicate and shadowing warnings per rule (`RuleAnalysis`).
+    @Published private(set) var ruleIssues: [RuleID: RuleIssue] = [:]
+    /// The one rule being added or edited inline; nil when no editor is open.
+    @Published var draft: RuleDraftState? {
+        didSet { if showsDraftErrors { draftErrors = validation(of: draft)?.errors ?? [] } }
+    }
+    /// Shown under the editor's fields once Save was pressed; recomputed on every later change.
+    @Published private(set) var draftErrors: [RuleFieldError] = []
+    /// A save error that is not a field error (configuration unavailable, write failed).
+    @Published private(set) var draftMessage: String?
 
     private let configController: ConfigController
     private let coordinator: RoutingCoordinator
     private let defaultBrowserService: DefaultBrowserService
     /// The same confirmation flow as the menu item; returns true to proceed.
     private let confirmReset: @MainActor () -> Bool
+    /// Asks before deleting a rule (id, description); returns true to delete.
+    private let confirmDeleteRule: @MainActor (RuleID, String) -> Bool
+    private var showsDraftErrors = false
 
     /// NIT #8: while a `setDefaultApplication` call is in flight, notification re-reads may only report success.
     private var setCallInFlight = false
@@ -28,11 +53,13 @@ final class SettingsModel: ObservableObject {
     private var httpsRequested = false
 
     init(configController: ConfigController, coordinator: RoutingCoordinator,
-         defaultBrowserService: DefaultBrowserService, confirmReset: @escaping @MainActor () -> Bool) {
+         defaultBrowserService: DefaultBrowserService, confirmReset: @escaping @MainActor () -> Bool,
+         confirmDeleteRule: @escaping @MainActor (RuleID, String) -> Bool) {
         self.configController = configController
         self.coordinator = coordinator
         self.defaultBrowserService = defaultBrowserService
         self.confirmReset = confirmReset
+        self.confirmDeleteRule = confirmDeleteRule
         configState = configController.state
         defaultBrowser = defaultBrowserService.status()
     }
@@ -58,7 +85,13 @@ final class SettingsModel: ObservableObject {
     }
 
     func boundDirectory(_ rule: RuleID) -> String? {
-        config?.targets[rule].binding?.directory
+        config?.binding(for: rule)?.directory
+    }
+
+    /// The rules above the fallback; the built-in ones while the configuration is unavailable
+    /// (shown disabled, as routing then uses them).
+    var userRules: [RuleID] {
+        (config ?? .unseededDefault).rules.map(\.id)
     }
 
     /// The saved previous browser, when its app still exists.
@@ -81,10 +114,104 @@ final class SettingsModel: ObservableObject {
         configState = configController.state
         if let config {
             statuses = ConfigValidator.status(config: config, catalog: catalog)
+            ruleIssues = RuleAnalysis.issues(config)
         } else {
             statuses = [:]
+            ruleIssues = [:]
+        }
+        // An edited rule that no longer exists (or a config that became unavailable) closes the editor.
+        if let editing = draft?.editing, config?.rule(editing) == nil {
+            cancelDraft()
+        } else if draft != nil, config == nil {
+            cancelDraft()
         }
         defaultBrowser = defaultBrowserService.status()
+    }
+
+    // MARK: Rule list (#14)
+
+    func beginAdd() {
+        startDraft(RuleDraftState(editing: nil, matchType: .host, host: "", pathPrefix: "", directory: nil))
+    }
+
+    func beginEdit(_ rule: RuleID) {
+        guard let existing = config?.rule(rule) else { return }
+        startDraft(RuleDraftState(editing: rule, matchType: existing.match.type, host: existing.match.host,
+                                  pathPrefix: existing.match.pathPrefix ?? "", directory: nil))
+    }
+
+    func cancelDraft() {
+        showsDraftErrors = false
+        draft = nil
+        draftErrors = []
+        draftMessage = nil
+    }
+
+    /// Validates through the coordinator, which saves and re-routes waiting links on success.
+    func saveDraft() {
+        guard let draft else { return }
+        draftMessage = nil
+        var ruleDraft = RuleDraft(matchType: draft.matchType, host: draft.host, pathPrefix: draft.pathPrefix)
+        if draft.editing == nil, let directory = draft.directory {
+            guard case .loaded(let catalog) = catalog, let profile = catalog.profile(directory: directory) else {
+                draftMessage = "Profile '\(directory)' no longer exists – press Refresh"
+                return
+            }
+            ruleDraft.binding = ProfileBinding(profile: profile, matchedBy: nil)
+        }
+        do throws(RuleEditError) {
+            if let editing = draft.editing {
+                try coordinator.updateRule(id: editing, draft: ruleDraft)
+            } else {
+                try coordinator.addRule(ruleDraft)
+            }
+            cancelDraft()
+        } catch {
+            if case .invalid(let errors) = error {
+                showsDraftErrors = true
+                draftErrors = errors
+            } else {
+                Log.ui.notice("Saving a rule failed: \(String(describing: error), privacy: .public)")
+                draftMessage = UIText.ruleEditError(error)
+            }
+        }
+        refresh()
+    }
+
+    func deleteRule(_ rule: RuleID) {
+        ruleMessages[rule] = nil
+        guard confirmDeleteRule(rule, UIText.ruleDescription(rule, config: config)) else { return }
+        do throws(RuleEditError) {
+            try coordinator.deleteRule(id: rule)
+        } catch {
+            Log.ui.notice("Deleting \(rule.rawValue, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+            ruleMessages[rule] = UIText.ruleEditError(error)
+        }
+        refresh()
+    }
+
+    /// `offset` -1 moves the rule up, +1 down.
+    func moveRule(_ rule: RuleID, by offset: Int) {
+        ruleMessages[rule] = nil
+        do throws(RuleEditError) {
+            try coordinator.moveRule(id: rule, by: offset)
+        } catch {
+            Log.ui.notice("Moving \(rule.rawValue, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+            ruleMessages[rule] = UIText.ruleEditError(error)
+        }
+        refresh()
+    }
+
+    /// Starting another edit or add discards the unsaved draft.
+    private func startDraft(_ state: RuleDraftState) {
+        cancelDraft()
+        draft = state
+    }
+
+    private func validation(of state: RuleDraftState?) -> RuleValidation? {
+        guard let state, let config else { return nil }
+        let ruleDraft = RuleDraft(matchType: state.matchType, host: state.host, pathPrefix: state.pathPrefix)
+        return RuleValidator.validate(ruleDraft, existing: config.rules, editing: state.editing)
     }
 
     // MARK: Routing rules
@@ -105,7 +232,7 @@ final class SettingsModel: ObservableObject {
 
     func detect(rule: RuleID) {
         ruleMessages[rule] = nil
-        guard let identity = config?.targets[rule].identity else { return }
+        guard let identity = config?.identity(for: rule) else { return }
         catalog = coordinator.loadCatalog()
         guard case .loaded(let profiles) = catalog else {
             refresh()
