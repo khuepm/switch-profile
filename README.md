@@ -4,7 +4,7 @@
 
 A small macOS utility that routes links opened from other apps to the right Google Chrome profile.
 
-**Status: local demo (v0.1.0).** The app builds from source into a local, ad-hoc signed `.app`. There is no downloadable release. Google Chrome is the initial target browser.
+**Status: local demo (v0.2.0).** The app builds from source into a local, ad-hoc signed `.app` (or download from GitHub Releases). Google Chrome is the initial target browser.
 
 ## How it works
 
@@ -39,7 +39,7 @@ Hosts match exactly. Subdomains such as `www.github.com`, `api.github.com`, `gis
 
 Profile display names and email addresses are not necessarily directory names. The app maps them to actual existing profile directories such as `Default` or `Profile 2`, without guessing, modifying login data, or silently creating a new profile.
 
-## What v0.1.0 includes
+## What v0.2.0 includes
 
 1. A native macOS AppKit menu bar app that receives HTTP/HTTPS URL-open events.
 2. Ordered repository/domain rules, fallback routing, and loop prevention.
@@ -123,7 +123,7 @@ When you set Switch Profile as default, it records the previous browser. In Sett
 <!-- sp:version -->
 ## Version
 
-0.1.0 (build 1). Minimum macOS 13 (deployment target); tested on macOS 27 only.
+0.2.0 (build 2). Minimum macOS 13 (deployment target); tested on macOS 27 only.
 
 <!-- sp:signing -->
 ## Signing limitations

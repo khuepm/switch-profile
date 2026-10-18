@@ -4,7 +4,7 @@
 
 一个小巧的 macOS 工具，将其他应用打开的链接分配到正确的 Google Chrome 配置文件（Profile）。
 
-**当前状态：本地演示版（v0.1.0）。** 应用从源码构建为本地 ad-hoc 签名的 `.app`，尚无可下载的发布版本。首个支持目标是 Google Chrome。
+**当前状态：本地演示版（v0.2.0）。** 应用从源码构建为本地 ad-hoc 签名的 `.app`（也可从 GitHub Releases 下载）。首个支持目标是 Google Chrome。
 
 ## 工作原理
 
@@ -39,7 +39,7 @@
 
 配置文件的显示名称和邮箱地址不一定等于目录名称。应用映射到实际存在的目录，如 `Default` 或 `Profile 2`，不会猜测、修改登录数据或静默创建新配置文件。
 
-## v0.1.0 包含的内容
+## v0.2.0 包含的内容
 
 1. 基于 AppKit 的原生 macOS 菜单栏应用，接收 HTTP/HTTPS URL 打开事件。
 2. 顺序明确的仓库和域名规则、备用路由及循环防护。
@@ -123,7 +123,7 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
 <!-- sp:version -->
 ## 版本
 
-0.1.0（build 1）。最低 macOS 13（部署目标）；目前仅在 macOS 27 上测试过。
+0.2.0（build 2）。最低 macOS 13（部署目标）；目前仅在 macOS 27 上测试过。
 
 <!-- sp:signing -->
 ## 签名限制
