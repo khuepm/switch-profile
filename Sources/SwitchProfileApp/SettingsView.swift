@@ -91,9 +91,77 @@ struct SettingsView: View {
             if let message = model.configMessage {
                 Text(message).foregroundStyle(.red)
             }
-            ForEach(model.config?.ruleOrder ?? [], id: \.self) { rule in
-                RuleRow(model: model, rule: rule)
+            Text("Rules are checked from top to bottom; the first match wins. The fallback is always last.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            let rules = model.userRules
+            ForEach(Array(rules.enumerated()), id: \.element) { index, rule in
+                RuleRow(model: model, rule: rule, isFirst: index == 0, isLast: index == rules.count - 1)
             }
+            if model.draft != nil, model.draft?.editing == nil {
+                RuleEditorFields(model: model)
+            } else {
+                Button("Add rule") { model.beginAdd() }
+                    .disabled(!model.isConfigWritable)
+            }
+            RuleRow(model: model, rule: .fallback, isFirst: false, isLast: true)
+        }
+    }
+}
+
+/// Inline editor for the rule being added or edited; field errors appear under their field.
+private struct RuleEditorFields: View {
+    @ObservedObject var model: SettingsModel
+
+    private var isAdding: Bool { model.draft?.editing == nil }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(isAdding ? "New rule" : "Edit \(model.draft?.editing?.rawValue ?? "")").font(.headline)
+            Picker("Match", selection: field(\.matchType, default: .host)) {
+                Text("Exact host").tag(RuleMatchType.host)
+                Text("Host and path prefix").tag(RuleMatchType.hostPathPrefix)
+            }
+            TextField("Host", text: field(\.host, default: ""), prompt: Text("github.com"))
+            errors(.host)
+            if model.draft?.matchType == .hostPathPrefix {
+                TextField("Path prefix", text: field(\.pathPrefix, default: ""), prompt: Text("/owner/repo"))
+                errors(.path)
+            }
+            if isAdding {
+                Picker("Profile", selection: field(\.directory, default: nil)) {
+                    Text("Not set").tag(String?.none)
+                    ForEach(model.catalogProfiles, id: \.directory) { profile in
+                        Text(UIText.profileLabel(profile)).tag(Optional(profile.directory))
+                    }
+                }
+            }
+            errors(.rule)
+            if let message = model.draftMessage {
+                Text(message).font(.footnote).foregroundStyle(.red).textSelection(.enabled)
+            }
+            HStack {
+                Button("Save") { model.saveDraft() }
+                    .keyboardShortcut(.defaultAction)
+                Button("Cancel") { model.cancelDraft() }
+                    .keyboardShortcut(.cancelAction)
+            }
+        }
+        .disabled(!model.isConfigWritable)
+        .padding(.vertical, 4)
+    }
+
+    private func field<Value>(_ keyPath: WritableKeyPath<RuleDraftState, Value>, default fallback: Value) -> Binding<Value> {
+        Binding(get: { model.draft?[keyPath: keyPath] ?? fallback },
+                set: { model.draft?[keyPath: keyPath] = $0 })
+    }
+
+    @ViewBuilder
+    private func errors(_ field: RuleField) -> some View {
+        ForEach(Array(model.draftErrors.filter { $0.field == field }.enumerated()), id: \.offset) { _, error in
+            Text(UIText.ruleFieldError(error, config: model.config))
+                .font(.footnote)
+                .foregroundStyle(.red)
         }
     }
 }
@@ -101,6 +169,8 @@ struct SettingsView: View {
 private struct RuleRow: View {
     @ObservedObject var model: SettingsModel
     let rule: RuleID
+    let isFirst: Bool
+    let isLast: Bool
 
     private var status: TargetStatus? { model.statuses[rule] }
 
@@ -117,9 +187,17 @@ private struct RuleRow: View {
     /// Picker, Detect and Confirm are disabled while the config is unavailable or the row has no catalog.
     private var isDisabled: Bool { !model.isConfigWritable || isCatalogUnavailable }
 
+    private var isEditing: Bool { rule != .fallback && model.draft?.editing == rule }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("\(rule.rawValue): \(UIText.ruleDescription(rule, config: model.config))").font(.headline)
+            issueLine
+            if isEditing {
+                RuleEditorFields(model: model)
+            } else if rule != .fallback {
+                ruleButtons
+            }
             Text("Identity: \(model.config?.identity(for: rule) ?? "none (choose a profile)")")
                 .foregroundStyle(.secondary)
             HStack {
@@ -128,9 +206,9 @@ private struct RuleRow: View {
                     Text(rule == .fallback ? "Last active Chrome profile" : "Not set").tag(String?.none)
                     pickerTags
                 }
-                if rule != .fallback {
+                if rule != .fallback, model.config?.identity(for: rule) != nil {
                     Button("Detect") { model.detect(rule: rule) }
-                        .disabled(isDisabled || model.config?.identity(for: rule) == nil)
+                        .disabled(isDisabled)
                 }
             }
             .disabled(isDisabled)
@@ -140,6 +218,35 @@ private struct RuleRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    /// Edit, Move up, Move down and Delete…; the fallback has none.
+    private var ruleButtons: some View {
+        HStack {
+            Button("Edit") { model.beginEdit(rule) }
+                .accessibilityLabel("Edit \(rule.rawValue)")
+            Button("Move up") { model.moveRule(rule, by: -1) }
+                .disabled(isFirst)
+                .accessibilityLabel("Move \(rule.rawValue) up")
+            Button("Move down") { model.moveRule(rule, by: 1) }
+                .disabled(isLast)
+                .accessibilityLabel("Move \(rule.rawValue) down")
+            Button("Delete…") { model.deleteRule(rule) }
+                .accessibilityLabel("Delete \(rule.rawValue)")
+        }
+        .disabled(!model.isConfigWritable)
+    }
+
+    @ViewBuilder
+    private var issueLine: some View {
+        switch model.ruleIssues[rule] {
+        case .shadowed(let earlier)?:
+            Text(UIText.ruleIssue(.shadowed(by: earlier), config: model.config)).foregroundStyle(.orange)
+        case .duplicate(let earlier)?:
+            Text(UIText.ruleIssue(.duplicate(of: earlier), config: model.config)).foregroundStyle(.red)
+        case nil:
+            EmptyView()
+        }
     }
 
     private var selection: Binding<String?> {

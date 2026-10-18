@@ -135,7 +135,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
         if settingsWindowController == nil {
             let model = SettingsModel(configController: configController, coordinator: coordinator,
                                       defaultBrowserService: defaultBrowserService,
-                                      confirmReset: { [weak self] in self?.confirmReset() ?? false })
+                                      confirmReset: { [weak self] in self?.confirmReset() ?? false },
+                                      confirmDeleteRule: { [weak self] rule, description in
+                                          self?.confirmDeleteRule(rule, description: description) ?? false
+                                      })
             settingsWindowController = SettingsWindowController(model: model)
         }
         settingsWindowController?.show()
@@ -160,6 +163,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
         alert.messageText = "Reset the configuration to defaults?"
         alert.informativeText = "The current configuration file is backed up next to it, then replaced with the defaults. Profile mappings are detected again from Chrome."
         alert.addButton(withTitle: "Reset")
+        alert.addButton(withTitle: "Cancel")
+        NSApp.activate(ignoringOtherApps: true)
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    private func confirmDeleteRule(_ rule: RuleID, description: String) -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Delete rule \(rule.rawValue)?"
+        alert.informativeText = "\(description). Links that match it will use the next matching rule."
+        alert.addButton(withTitle: "Delete")
         alert.addButton(withTitle: "Cancel")
         NSApp.activate(ignoringOtherApps: true)
         return alert.runModal() == .alertFirstButtonReturn

@@ -18,6 +18,41 @@ enum UIText {
         }
     }
 
+    /// Shown in red under the matching field of the rule editor.
+    static func ruleFieldError(_ error: RuleFieldError, config: AppConfig?) -> String {
+        switch error {
+        case .emptyHost: "Enter a host, for example github.com"
+        case .wildcardHost: "Wildcards are not supported; enter an exact host such as github.com"
+        case .invalidHost: "Enter a host name only, without http://, a path, a port, @ or spaces"
+        case .emptyPath: "Enter a path prefix, for example /owner/repo"
+        case .pathMissingLeadingSlash: "The path prefix must start with /"
+        case .pathIsRoot: "/ alone matches every path; choose Exact host instead"
+        case .invalidPath: "The path prefix cannot contain ?, #, spaces, empty segments (//), . or .."
+        case .duplicate(let other):
+            "Same as \(other.rawValue) (\(ruleDescription(other, config: config))); edit that rule instead"
+        }
+    }
+
+    static func ruleIssue(_ issue: RuleIssue, config: AppConfig?) -> String {
+        switch issue {
+        case .shadowed(let earlier):
+            "Never matches: \(earlier.rawValue) (\(ruleDescription(earlier, config: config))) is above and always matches first. Move this rule above it."
+        case .duplicate(let earlier):
+            "Same as \(earlier.rawValue); this rule never matches"
+        }
+    }
+
+    static func ruleEditError(_ error: RuleEditError) -> String {
+        switch error {
+        case .invalid: "Fix the highlighted fields"
+        case .ruleNotFound: "This rule no longer exists"
+        case .fallbackImmutable: "The fallback cannot be edited, moved or deleted"
+        case .cannotMove: "This rule cannot move further"
+        case .configUnavailable: "Configuration file is invalid – Reset to defaults… first"
+        case .saveFailed(let error): "Could not save: \(configError(error))"
+        }
+    }
+
     static func catalogError(_ error: LocalStateError) -> String {
         switch error {
         case .notFound(let path): "Google Chrome profile data not found at \(path)"
