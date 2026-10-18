@@ -1,5 +1,6 @@
 import AppKit
 import SwitchProfileCore
+import SwitchProfileUI
 
 /// Composition root and the single consumer of coordinator and configuration change events.
 /// It is the only assigner of `coordinator.sink` and `configController.onChange`.
@@ -58,6 +59,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 0. Edit key equivalents (Cmd+X/C/V/A/Z) for text fields; the menu bar itself stays hidden.
+        MainMenu.install(in: NSApp, appName: "Switch Profile")
         installTerminationSignalHandler()
         // 1. An absent file becomes the in-memory unseeded default; nothing is written.
         configController.load()

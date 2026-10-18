@@ -73,12 +73,9 @@ enum DryRunCommand {
             notes.append("note: config seeded in memory (not saved)")
         }
 
-        switch catalog {
-        case .loaded(let profiles):
-            notes.insert("local-state: \(localStateURL.path) (\(profiles.profiles.count) profiles)", at: 0)
-        case .unavailable(let error):
-            notes.insert("local-state: \(localStateURL.path) (unavailable: \(error))", at: 0)
-        }
+        notes.insert(DryRunReport.localStateNote(path: localStateURL.path, catalog: catalog), at: 0)
+        let catalogError: LocalStateError?
+        if case .unavailable(let error) = catalog { catalogError = error } else { catalogError = nil }
 
         // Chrome state.
         let chromeRunning: Bool
@@ -112,7 +109,8 @@ enum DryRunCommand {
                 }
             }
             if case .success = request {} else { allLaunchable = false }
-            blocks.append(DryRunReport.render(url: url, decision: decision, request: request, chromeRunning: chromeRunning))
+            blocks.append(DryRunReport.render(url: url, decision: decision, request: request,
+                                              chromeRunning: chromeRunning, catalogError: catalogError))
         }
         print(blocks.joined(separator: "\n\n"))
         return allLaunchable ? exitLaunchable : exitNotLaunchable

@@ -9,7 +9,6 @@ struct SettingsView: View {
             defaultBrowserSection
             profilesSection
             rulesSection
-            testLinkSection
         }
         .formStyle(.grouped)
         .frame(minWidth: 560, minHeight: 600)
@@ -64,7 +63,12 @@ struct SettingsView: View {
                 case .loaded(let catalog):
                     Text("\(catalog.profiles.count) profiles found in Chrome Local State")
                 case .unavailable(let error):
-                    Text(UIText.catalogError(error)).foregroundStyle(.red)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(CatalogMessages.unavailable(error)).foregroundStyle(.red)
+                        Text(CatalogMessages.remedy(error, requester: .app))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
                 Button("Refresh") { model.reload() }
@@ -92,25 +96,6 @@ struct SettingsView: View {
             }
         }
     }
-
-    // MARK: 4. Test a link
-
-    private var testLinkSection: some View {
-        Section("Test a link") {
-            TextField("URL", text: $model.previewText)
-            if let hint = model.previewValidation {
-                Text(hint).font(.footnote).foregroundStyle(.secondary)
-            }
-            HStack {
-                Button("Check rule") { model.checkRule() }
-                Button("Open test link") { model.openTestLink() }
-            }
-            .disabled(model.previewIsEmpty)
-            if let result = model.previewResult {
-                Text(result).textSelection(.enabled)
-            }
-        }
-    }
 }
 
 private struct RuleRow: View {
@@ -119,9 +104,13 @@ private struct RuleRow: View {
 
     private var status: TargetStatus? { model.statuses[rule] }
 
+    /// Also true for an unseeded rule while the catalog is unavailable (its status is `.unset`).
     private var isCatalogUnavailable: Bool {
-        if case .catalogUnavailable? = status { return true }
-        return false
+        switch status {
+        case .catalogUnavailable?: true
+        case .unset?: model.catalogError != nil
+        default: false
+        }
     }
 
     /// Picker, Detect and Confirm are disabled while the config is unavailable or the row has no catalog.
@@ -194,7 +183,11 @@ private struct RuleRow: View {
                     .disabled(isDisabled)
             }
         case .unset?:
-            Text(rule == .r4 ? "No fallback profile – choose one" : "Not set – choose a profile")
+            if model.catalogError != nil {
+                Text("Chrome profiles unavailable – see above").foregroundStyle(.secondary)
+            } else {
+                Text(rule == .r4 ? "No fallback profile – choose one" : "Not set – choose a profile")
+            }
         case .missing(let binding)?:
             Text("Profile '\(binding.directory)' no longer exists – choose a profile").foregroundStyle(.orange)
         case .identityMismatch(let binding, let current)?:

@@ -9,7 +9,7 @@ public enum Rejection: Equatable, Sendable {
     case malformed(MalformedReason)
 }
 // Core has no "empty" case: it only ever receives a URL object. Empty or unparseable typed
-// text is UI-only validation in the preview field and never reaches Core.
+// text is rejected by the caller before Core (e.g. the dry run's "not a valid URL").
 
 public enum Classification: Equatable, Sendable {
     /// e.g. "host github.com, repository TruckerPoints/trucker-points"

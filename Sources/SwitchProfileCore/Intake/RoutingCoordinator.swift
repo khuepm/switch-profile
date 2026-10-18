@@ -81,7 +81,7 @@ public final class RoutingCoordinator {
     /// `reroutingBlocked`, every `.needsProfile(.catalogUnavailable)` item (all rules) is re-enqueued
     /// with its last attempt, and every `.needsProfile(.unset)` item whose rule now has a binding
     /// (typically just seeded by this or an earlier load) is re-enqueued as `.route`.
-    /// "Check rule" passes `false`, so a preview never causes a launch.
+    /// A read-only caller passes `false`, so a plain read never causes a launch.
     /// The sink is notified only when items were re-enqueued, so plain reads cause no UI fan-out.
     public func loadCatalog(reroutingBlocked: Bool = true) -> CatalogState {
         loadCatalog(reroutingBlocked: reroutingBlocked, excluding: nil)

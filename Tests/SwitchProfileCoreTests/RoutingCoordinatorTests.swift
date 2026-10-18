@@ -628,7 +628,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(item.kind == .needsProfile(.catalogUnavailable(.notFound("/x/Local State"))))
 
         h.loader.state = .loaded(Fixture.validCatalog())
-        // A preview ("Check rule") never re-routes.
+        // A non-rerouting load never re-routes.
         _ = h.coordinator.loadCatalog(reroutingBlocked: false)
         await h.coordinator.waitUntilIdle()
         #expect(h.coordinator.pending.items == [item])
@@ -694,7 +694,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let item = try #require(h.coordinator.pending.items.first)
         #expect(item.kind == .needsProfile(.unset))
 
-        // "Check rule" seeds but never launches.
+        // A non-rerouting load seeds but never launches.
         h.loader.state = .loaded(Fixture.validCatalog())
         _ = h.coordinator.loadCatalog(reroutingBlocked: false)
         await h.coordinator.waitUntilIdle()

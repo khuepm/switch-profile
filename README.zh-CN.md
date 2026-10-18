@@ -34,7 +34,6 @@
 - 默认浏览器状态及设置说明。
 - 已检测到的 Chrome 配置文件，以及各规则的配置文件选择器。
 - 备用配置文件选择器。
-- URL 输入框、**Check rule**（检查规则）和 **Open test link**（测试打开）按钮。
 - 配置文件不存在时的明确恢复选项。
 
 配置文件的显示名称和邮箱地址不一定等于目录名称。应用映射到实际存在的目录，如 `Default` 或 `Profile 2`，不会猜测、修改登录数据或静默创建新配置文件。
@@ -43,7 +42,7 @@
 
 1. 基于 AppKit 的原生 macOS 菜单栏应用，接收 HTTP/HTTPS URL 打开事件。
 2. 顺序明确的仓库和域名规则、备用路由及循环防护。
-3. 菜单栏入口、设置、配置文件映射和规则预览。
+3. 菜单栏入口、设置和配置文件映射。路由可在终端中用 `--dry-run` 检查。
 4. 由一个脚本构建的本地 `.app`，安装与卸载说明见下文。
 5. 覆盖路由、配置和启动的自动化测试。手动检查（Chrome 正在运行及已关闭时逐个验证三个配置文件，以及端到端矩阵）记录在[验收矩阵](docs/ACCEPTANCE.md)中。
 
@@ -76,7 +75,8 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
 - 首次运行时，Switch Profile 会根据规则表中的身份为 R1–R3 自动识别配置文件，这些行显示 "Auto-detected: matched by …"。点击 **Confirm** 确认，或选择其他配置文件。
 - **Detect** 按规则的身份重新查找。如果匹配到多个配置文件，应用不会自动选择，而是由你选择。
 - R4 是所有其他主机名的备用配置文件，从不自动选择。若 R4 为 "Not set"，无关链接会在待处理链接窗口中等待。
-- **Check rule** 显示某个 URL 对应的规则和配置文件，不会打开 Chrome。**Open test link** 通过真实的路由流程打开该 URL。
+- 如需查看某个 URL 对应的规则和配置文件而不打开 Chrome，请使用试运行（见“故障排除”中的**在终端中检查路由**）。
+- 文本框支持标准编辑快捷键：Cmd+X、Cmd+C、Cmd+V、Cmd+A、Cmd+Z 和 Shift-Cmd-Z。
 - 配置文件缺失或账号变更时，会在对应行和菜单中标记（"Profile mapping needs attention …"）。
 
 配置保存在 `~/Library/Application Support/SwitchProfile/config.json`。若文件无效，菜单显示 "Configuration error – Reset to defaults…"。重置时会保留名为 `config.corrupt-<日期>.json` 的备份。
@@ -91,7 +91,7 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
 <!-- sp:troubleshooting -->
 ## 故障排除
 
-- **"Chrome profiles unavailable" / Local State 错误。** Switch Profile 读取 `~/Library/Application Support/Google/Chrome/Local State`。请确认 Chrome 已安装并至少启动过一次。在 macOS 27 上，系统可能拒绝应用读取该文件；请在“系统设置”→“隐私与安全性”中为 Switch Profile 授予访问权限（App Data 或“完全磁盘访问权限”），然后在 Settings 中点击 **Refresh**，或在待处理链接窗口中点击 **Refresh profiles**。
+- **"Chrome profiles unavailable" / Local State 错误。** Switch Profile 读取 `~/Library/Application Support/Google/Chrome/Local State`。请确认 Chrome 已安装并至少启动过一次。在 macOS 27 上，系统可能拒绝应用读取该文件；请在“系统设置”→“隐私与安全性”中为 Switch Profile 授予访问权限（App Data 或“完全磁盘访问权限”），然后在 Settings 中点击 **Refresh**，或在待处理链接窗口中点击 **Refresh profiles**。Settings 和试运行会显示 "Chrome profiles unavailable" 及上述解决方法，而不是 "no profile set"。试运行使用终端的权限，因此运行 `--dry-run` 的终端应用也需要同样的 App Data 或“完全磁盘访问权限”。
 - **待处理链接窗口。** 暂时无法打开的链接（未设置配置文件、配置文件缺失、无法打开 Chrome）会被保留，不会丢弃。从菜单中的 "Pending links (n)…" 打开窗口，使用 **Open once**、**Open and use for R…**、**Retry** 或 **Discard**。
 - **另一个副本是默认浏览器。** 如果 Settings 显示 "Another copy at … is the default; remove it."，请删除该副本，用 `lsregister -u <路径>`（完整路径见“卸载”）取消注册，然后重新设为默认。
 - **Gatekeeper。** 应用为 ad-hoc 签名且未经公证。如果 macOS 阻止打开，请按住 Control 键点击应用并选择“打开”，或在“系统设置”→“隐私与安全性”中允许。

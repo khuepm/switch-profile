@@ -92,6 +92,22 @@ import Testing
         #expect(!file.code.contains(token), "DryRunCommand.swift contains \(token)")
     }
 
+    /// (g) The agent app installs a main menu so text fields get Cmd+X/C/V/A/Z (#12).
+    @Test func appDelegateInstallsTheMainMenu() throws {
+        let file = try #require(try Self.sourceFiles().first { $0.path == Self.appDelegate })
+        #expect(file.code.contains("MainMenu.install("))
+    }
+
+    /// (h) Settings has no routing preview; routing is checked with `--dry-run` (#12).
+    @Test(arguments: ["\"Check rule\"", "\"Open test link\"", "\"Test a link\"", "checkRule", "openTestLink"])
+    func settingsHasNoRoutingPreview(_ token: String) throws {
+        let files = try Self.sourceFiles()
+        for path in ["SwitchProfileApp/SettingsView.swift", "SwitchProfileApp/SettingsModel.swift"] {
+            let file = try #require(files.first { $0.path == path })
+            #expect(!file.code.contains(token), "\(path) contains \(token)")
+        }
+    }
+
     // MARK: stripComments
 
     @Test func stripsLineComment() {

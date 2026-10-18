@@ -20,11 +20,17 @@ let package = Package(
     ],
     targets: [
         .target(name: "SwitchProfileCore"),
-        .executableTarget(name: "SwitchProfileApp", dependencies: ["SwitchProfileCore"]),
+        .target(name: "SwitchProfileUI"),
+        .executableTarget(name: "SwitchProfileApp", dependencies: ["SwitchProfileCore", "SwitchProfileUI"]),
         .testTarget(
             name: "SwitchProfileCoreTests",
             dependencies: ["SwitchProfileCore"],
             resources: [.copy("Fixtures")],
+            swiftSettings: testSwiftSettings
+        ),
+        .testTarget(
+            name: "SwitchProfileUITests",
+            dependencies: ["SwitchProfileUI"],
             swiftSettings: testSwiftSettings
         ),
     ]

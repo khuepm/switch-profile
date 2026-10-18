@@ -1,6 +1,6 @@
 import Foundation
 
-/// The single choke point every forward passes through (routed links, "Open once", test links).
+/// The single choke point every forward passes through (routed links, "Open once", "Open and use").
 /// Loop-prevention invariant: it only ever opens the application whose bundle identifier is exactly
 /// `com.google.Chrome` and is not our own, and never asks LaunchServices for a URL's default handler.
 public struct ChromeLauncher: Sendable {
