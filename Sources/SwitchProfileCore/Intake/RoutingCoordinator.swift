@@ -107,8 +107,8 @@ public final class RoutingCoordinator {
     /// links when the rule can now launch: a non-nil binding, or nil for R4 ("Last active Chrome
     /// profile"). Choosing "Not set" for R1–R3 or a failed save re-routes nothing.
     public func updateBinding(rule: RuleID, to binding: ProfileBinding?) throws(ConfigError) {
-        try config.update { $0.targets[rule].binding = binding }
-        if binding != nil || rule == .r4 {
+        try config.update { $0.setBinding(binding, for: rule) }
+        if binding != nil || rule == .fallback {
             reroutePending(rule: rule)
         } else {
             startDrainIfNeeded()
@@ -160,7 +160,7 @@ public final class RoutingCoordinator {
         guard let profile = catalog.profile(directory: directory) else { throw .profileNotFound(directory) }
         // 4. Save.
         do throws(ConfigError) {
-            try config.update { $0.targets[item.rule].binding = ProfileBinding(profile: profile, matchedBy: nil) }
+            try config.update { $0.setBinding(ProfileBinding(profile: profile, matchedBy: nil), for: item.rule) }
         } catch {
             throw .saveFailed(error)
         }
@@ -312,7 +312,7 @@ public final class RoutingCoordinator {
     /// e.g. after first-run seeding ran on a later successful catalog load.
     private func isBoundUnset(_ item: PendingItem) -> Bool {
         guard case .needsProfile(.unset) = item.kind, case .loaded(let current) = config.routingConfig else { return false }
-        return current.targets[item.rule].binding != nil
+        return current.binding(for: item.rule) != nil
     }
 
     private static func isReroutable(_ kind: PendingKind) -> Bool {

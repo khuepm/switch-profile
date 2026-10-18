@@ -5,6 +5,9 @@ import Testing
 @testable import SwitchProfileCore
 
 @Suite struct URLClassifierTests {
+    /// The built-in rules; every vector below routes exactly as before #14 made rules editable.
+    static let rules = AppConfig.unseededDefault.rules
+
     static let r1: [String] = [
         "https://git.fis.vn/fis-gs/gs-hn/BTP_CPLQG_S7_2025_PM/plvn-v2-backend/-/merge_requests",
         "https://GIT.FIS.VN/x",
@@ -88,7 +91,7 @@ import Testing
     }
 
     private static func rule(of string: String) -> RuleID? {
-        if case .matched(let rule, _) = URLClassifier.classify(url(string)) { return rule }
+        if case .matched(let rule, _) = URLClassifier.classify(url(string), rules: Self.rules) { return rule }
         return nil
     }
 
@@ -109,15 +112,15 @@ import Testing
     }
 
     @Test(arguments: unsupportedSchemes) func rejectsUnsupportedScheme(_ string: String, _ scheme: String) {
-        #expect(URLClassifier.classify(Self.url(string)) == .rejected(.unsupportedScheme(scheme)))
+        #expect(URLClassifier.classify(Self.url(string), rules: Self.rules) == .rejected(.unsupportedScheme(scheme)))
     }
 
     @Test func rejectsMissingHost() {
-        #expect(URLClassifier.classify(Self.url("https:///foo")) == .rejected(.malformed(.missingHost)))
+        #expect(URLClassifier.classify(Self.url("https:///foo"), rules: Self.rules) == .rejected(.malformed(.missingHost)))
     }
 
     @Test func rejectsMissingScheme() {
-        #expect(URLClassifier.classify(Self.url("//github.com/x")) == .rejected(.malformed(.missingScheme)))
+        #expect(URLClassifier.classify(Self.url("//github.com/x"), rules: Self.rules) == .rejected(.malformed(.missingScheme)))
     }
 
     @Test func lengthBoundary() {
@@ -129,19 +132,23 @@ import Testing
 
         let overLimit = atLimit + "a"
         #expect(overLimit.utf8.count == 524_289)
-        #expect(URLClassifier.classify(Self.url(overLimit)) == .rejected(.malformed(.tooLong)))
+        #expect(URLClassifier.classify(Self.url(overLimit), rules: Self.rules) == .rejected(.malformed(.tooLong)))
     }
 
-    @Test func explanationNamesTheRepository() {
-        #expect(URLClassifier.classify(Self.url("https://github.com/TruckerPoints/trucker-points"))
-            == .matched(.r2, explanation: "host github.com, repository TruckerPoints/trucker-points"))
+    @Test func explanationNamesHostAndPath() {
+        #expect(URLClassifier.classify(Self.url("https://github.com/TruckerPoints/trucker-points"), rules: Self.rules)
+            == .matched(.r2, explanation: "host github.com, path /TruckerPoints/trucker-points"))
+        #expect(URLClassifier.classify(Self.url("https://git.fis.vn/x"), rules: Self.rules)
+            == .matched(.r1, explanation: "host git.fis.vn"))
+        #expect(URLClassifier.classify(Self.url("https://example.com/"), rules: Self.rules)
+            == .matched(.r4, explanation: "host example.com matches no rule; fallback"))
     }
 
     @Test func classificationNeverAltersTheURL() {
         for string in Self.r1 + Self.r2 + Self.r3 + Self.r4 {
             let url = Self.url(string)
             let before = url.absoluteString
-            _ = URLClassifier.classify(url)
+            _ = URLClassifier.classify(url, rules: Self.rules)
             #expect(url.absoluteString == before)
         }
     }

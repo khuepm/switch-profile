@@ -53,8 +53,8 @@ final class CoordinatorHarness {
     func bind(_ bindings: [RuleID: ProfileBinding]) throws {
         try config.update { config in
             config.seedPending = false
-            for rule in RuleID.allCases {
-                config.targets[rule].binding = bindings[rule]
+            for rule in config.ruleOrder {
+                config.setBinding(bindings[rule], for: rule)
             }
         }
     }
@@ -211,7 +211,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         h.opener.suspendedCalls = [1]
         h.coordinator.enqueue((1...3).map(Links.r4), source: .external)
         await h.opener.waitUntilCallStarted(1)
-        try h.config.update { $0.targets.R4.binding = b("Profile 8") }
+        try h.config.update { $0.setBinding(b("Profile 8"), for: .r4) }
         h.opener.resume(1)
         await h.coordinator.waitUntilIdle()
         #expect(h.opener.directories == ["Profile 7", "Profile 8", "Profile 8"])
@@ -388,7 +388,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let r2Item = try #require(h.pendingItem(Links.r2(2)))
 
         try h.coordinator.openAndRemember(id: target.id, directory: "Profile 7")
-        let saved = try #require(h.loadedConfig?.targets.R3.binding)
+        let saved = try #require(h.loadedConfig?.binding(for: .r3))
         #expect(saved == b("Profile 7"))
         #expect(saved.matchedBy == nil)
         #expect(ConfigStore(fileURL: h.file).load() == .loaded(try #require(h.loadedConfig)))
@@ -442,7 +442,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(throws: PendingActionError.catalogUnavailable(.noProfiles)) {
             try h.coordinator.openAndRemember(id: item.id, directory: "Default")
         }
-        #expect(h.loadedConfig?.targets.R3.binding == nil)
+        #expect(h.loadedConfig?.binding(for: .r3) == nil)
     }
 
     @Test func openAndRememberOnALaunchFailureIsNotApplicable() async throws {
@@ -552,7 +552,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(r3Item.kind == .needsProfile(.missing(b("Profile 99"))))
         #expect(r2Item.kind == .needsProfile(.unset))
 
-        try h.config.update { $0.targets.R3.binding = b("Profile 7") }
+        try h.config.update { $0.setBinding(b("Profile 7"), for: .r3) }
         h.coordinator.reroutePending(rule: .r3)
         await h.coordinator.waitUntilIdle()
 
@@ -574,7 +574,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(h.coordinator.pending.items.allSatisfy { $0.kind == .needsProfile(.unset) })
 
         try h.coordinator.updateBinding(rule: .r3, to: b("Profile 8"))
-        #expect(h.loadedConfig?.targets.R3.binding == b("Profile 8"))
+        #expect(h.loadedConfig?.binding(for: .r3) == b("Profile 8"))
         await h.coordinator.waitUntilIdle()
 
         #expect(h.opener.urls == urls.map(\.absoluteString))
@@ -594,7 +594,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         try h.coordinator.updateBinding(rule: .r3, to: nil)
         await h.coordinator.waitUntilIdle()
 
-        #expect(h.loadedConfig?.targets.R3.binding == nil)
+        #expect(h.loadedConfig?.binding(for: .r3) == nil)
         // Re-routing the R3 item would have turned it into `.unset`. (R4 is covered by
         // choosingLastActiveForR4ReroutesItsPendingLinks: nil there means last active.)
         #expect(h.coordinator.pending.items == before)
@@ -675,7 +675,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         }
 
         try h.coordinator.resetConfigToDefaults()
-        #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
+        #expect(h.loadedConfig?.binding(for: .r3)?.directory == "Default")
         await h.coordinator.waitUntilIdle()
         #expect(h.opener.directories == ["Default"])
         #expect(h.opener.urls == [Links.r3(1).absoluteString])
@@ -698,7 +698,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         h.loader.state = .loaded(Fixture.validCatalog())
         _ = h.coordinator.loadCatalog(reroutingBlocked: false)
         await h.coordinator.waitUntilIdle()
-        #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
+        #expect(h.loadedConfig?.binding(for: .r3)?.directory == "Default")
         #expect(h.coordinator.pending.items == [item])
         #expect(h.opener.callCount == 0)
 
@@ -739,9 +739,9 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         // Seeding happens only in ConfigController.resetToDefaults, after the coordinator's load.
         h.loader.seeds = false
         try h.coordinator.resetConfigToDefaults()
-        #expect(h.loadedConfig?.targets.R1.binding?.directory == "Profile 30")
-        #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
-        #expect(h.loadedConfig?.targets.R4.binding == nil)
+        #expect(h.loadedConfig?.binding(for: .r1)?.directory == "Profile 30")
+        #expect(h.loadedConfig?.binding(for: .r3)?.directory == "Default")
+        #expect(h.loadedConfig?.binding(for: .r4) == nil)
         await h.coordinator.waitUntilIdle()
         // The reset seeded R1 and R3, so both unset links open in seq order.
         #expect(h.opener.callCount == 2)
@@ -786,7 +786,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(h.opener.callCount == 0)
 
         try h.coordinator.updateBinding(rule: .r4, to: nil)
-        #expect(h.loadedConfig?.targets.R4.binding == nil)
+        #expect(h.loadedConfig?.binding(for: .r4) == nil)
         await h.coordinator.waitUntilIdle()
         #expect(h.opener.requests.map(\.arguments) == urls.map { [$0.absoluteString] })
         #expect(h.coordinator.pending.items.isEmpty)

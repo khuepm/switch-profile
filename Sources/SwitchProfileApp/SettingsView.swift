@@ -91,7 +91,7 @@ struct SettingsView: View {
             if let message = model.configMessage {
                 Text(message).foregroundStyle(.red)
             }
-            ForEach(RuleID.allCases, id: \.self) { rule in
+            ForEach(model.config?.ruleOrder ?? [], id: \.self) { rule in
                 RuleRow(model: model, rule: rule)
             }
         }
@@ -119,18 +119,18 @@ private struct RuleRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("\(rule.rawValue): \(UIText.ruleDescription(rule))").font(.headline)
-            Text("Identity: \(model.config?.targets[rule].identity ?? "none (choose a profile)")")
+            Text("\(rule.rawValue): \(UIText.ruleDescription(rule, config: model.config))").font(.headline)
+            Text("Identity: \(model.config?.identity(for: rule) ?? "none (choose a profile)")")
                 .foregroundStyle(.secondary)
             HStack {
                 Picker("Profile for \(rule.rawValue)", selection: selection) {
                     // For R4 the nil binding means "Last active Chrome profile", the default.
-                    Text(rule == .r4 ? "Last active Chrome profile" : "Not set").tag(String?.none)
+                    Text(rule == .fallback ? "Last active Chrome profile" : "Not set").tag(String?.none)
                     pickerTags
                 }
-                if rule != .r4 {
+                if rule != .fallback {
                     Button("Detect") { model.detect(rule: rule) }
-                        .disabled(isDisabled || model.config?.targets[rule].identity == nil)
+                        .disabled(isDisabled || model.config?.identity(for: rule) == nil)
                 }
             }
             .disabled(isDisabled)

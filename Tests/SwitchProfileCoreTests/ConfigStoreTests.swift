@@ -8,8 +8,8 @@ import Testing
     static func sampleConfig() -> AppConfig {
         var config = AppConfig.unseededDefault
         config.seedPending = false
-        config.targets.R1.binding = ProfileBinding(directory: "Profile 30", email: "khuepm18@example.com", displayName: "khuepm18", matchedBy: .displayName)
-        config.targets.R4.binding = ProfileBinding(directory: "Profile 9", email: nil, displayName: "Guest", matchedBy: nil)
+        config.setBinding(ProfileBinding(directory: "Profile 30", email: "khuepm18@example.com", displayName: "khuepm18", matchedBy: .displayName), for: .r1)
+        config.setBinding(ProfileBinding(directory: "Profile 9", email: nil, displayName: "Guest", matchedBy: nil), for: .r4)
         config.previousDefaultBrowser = DefaultBrowserRecord(bundleIdentifier: "com.google.Chrome", path: "/Applications/Google Chrome.app")
         return config
     }
@@ -27,17 +27,23 @@ import Testing
 
     // MARK: AppConfig coding (pure Data level)
 
-    @Test func encodingOmitsNilOptionalsAndTargetsIsAnObject() throws {
+    @Test func encodingOmitsNilOptionalsAndRulesIsAnOrderedList() throws {
         let data = try JSONEncoder().encode(AppConfig.unseededDefault)
         let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(json["previousDefaultBrowser"] == nil)
-        let targets = try #require(json["targets"] as? [String: Any])
-        #expect(Set(targets.keys) == ["R1", "R2", "R3", "R4"])
-        let r1 = try #require(targets["R1"] as? [String: Any])
+        #expect(Set(json.keys) == ["schemaVersion", "seedPending", "rules", "fallback", "nextRuleNumber"])
+        #expect(json["schemaVersion"] as? Int == 2)
+        #expect(json["nextRuleNumber"] as? Int == 5)
+        #expect(json["targets"] == nil)
+        let rules = try #require(json["rules"] as? [[String: Any]])
+        #expect(rules.map { $0["id"] as? String } == ["R1", "R2", "R3"])
+        let r1 = rules[0]
+        #expect(Set(r1.keys) == ["id", "match", "identity"])
         #expect(r1["identity"] as? String == "khuepm18")
-        #expect(r1["binding"] == nil)
-        let r4 = try #require(targets["R4"] as? [String: Any])
-        #expect(r4.isEmpty)
+        #expect(r1["match"] as? [String: String] == ["type": "host", "host": "git.fis.vn"])
+        #expect(rules[1]["match"] as? [String: String]
+            == ["type": "hostPathPrefix", "host": "github.com", "pathPrefix": "/TruckerPoints/trucker-points"])
+        let fallback = try #require(json["fallback"] as? [String: Any])
+        #expect(fallback.isEmpty)
 
         let signedOut = ProfileBinding(directory: "Profile 9", email: nil, displayName: "Guest", matchedBy: nil)
         let bindingJSON = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(signedOut)) as? [String: Any])
@@ -46,16 +52,19 @@ import Testing
 
     @Test func decodingAcceptsAbsentAndNullOptionals() throws {
         let json = #"""
-        {"schemaVersion":1,"seedPending":true,"previousDefaultBrowser":null,
-         "targets":{"R1":{"identity":null,"binding":{"directory":"Default","email":null,"displayName":"P","matchedBy":null}},
-                    "R2":{},"R3":{"binding":null},"R4":{"identity":"x"}}}
+        {"schemaVersion":2,"seedPending":true,"previousDefaultBrowser":null,"nextRuleNumber":5,
+         "rules":[{"id":"R1","match":{"type":"host","host":"git.fis.vn"},"identity":null,
+                   "binding":{"directory":"Default","email":null,"displayName":"P","matchedBy":null}},
+                  {"id":"R2","match":{"type":"host","host":"a.example"}},
+                  {"id":"R3","match":{"type":"host","host":"b.example"},"binding":null}],
+         "fallback":{"identity":"x"}}
         """#
         let config = try JSONDecoder().decode(AppConfig.self, from: Data(json.utf8))
         #expect(config.previousDefaultBrowser == nil)
-        #expect(config.targets.R1 == RuleTarget(identity: nil, binding: ProfileBinding(directory: "Default", email: nil, displayName: "P", matchedBy: nil)))
-        #expect(config.targets.R2 == RuleTarget())
-        #expect(config.targets.R3 == RuleTarget())
-        #expect(config.targets.R4 == RuleTarget(identity: "x"))
+        #expect(config.target(.r1) == RuleTarget(identity: nil, binding: ProfileBinding(directory: "Default", email: nil, displayName: "P", matchedBy: nil)))
+        #expect(config.target(.r2) == RuleTarget())
+        #expect(config.target(.r3) == RuleTarget())
+        #expect(config.target(.r4) == RuleTarget(identity: "x"))
     }
 
     @Test func roundTrip() throws {
@@ -75,10 +84,10 @@ import Testing
             return
         }
         #expect(config.seedPending == false)
-        #expect(config.targets.R1.binding?.matchedBy == .displayName)
-        #expect(config.targets.R2.binding?.directory == "Profile 47")
-        #expect(config.targets.R3 == RuleTarget(identity: "pmkhue.2013"))
-        #expect(config.targets.R4 == RuleTarget())
+        #expect(config.binding(for: .r1)?.matchedBy == .displayName)
+        #expect(config.binding(for: .r2)?.directory == "Profile 47")
+        #expect(config.target(.r3) == RuleTarget(identity: "pmkhue.2013"))
+        #expect(config.target(.r4) == RuleTarget())
         #expect(config.previousDefaultBrowser?.bundleIdentifier == "com.google.Chrome")
     }
 
@@ -88,7 +97,8 @@ import Testing
         #expect(ConfigStore(fileURL: dir.url.appendingPathComponent("config.json")).load() == .absent)
     }
 
-    @Test(arguments: ["config-corrupt", "config-missing-r4", "config-missing-seedpending", "config-bad-directory"])
+    @Test(arguments: ["config-corrupt", "config-missing-r4", "config-missing-seedpending", "config-bad-directory",
+                      "config-v2-corrupt"])
     func invalidFilesAreCorruptAndUntouched(_ fixture: String) throws {
         let dir = TempDir()
         defer { dir.cleanup() }
@@ -106,9 +116,9 @@ import Testing
     @Test func versionProbeRunsFirst() throws {
         let dir = TempDir()
         defer { dir.cleanup() }
-        let file = try installFixture("config-v2", in: dir)
+        let file = try installFixture("config-v3", in: dir)
         let before = try Data(contentsOf: file)
-        #expect(ConfigStore(fileURL: file).load() == .unavailable(.unsupportedVersion(2)))
+        #expect(ConfigStore(fileURL: file).load() == .unavailable(.unsupportedVersion(3)))
         #expect(try Data(contentsOf: file) == before)
     }
 

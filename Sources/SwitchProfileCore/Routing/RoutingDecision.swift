@@ -12,7 +12,7 @@ public enum Rejection: Equatable, Sendable {
 // text is rejected by the caller before Core (e.g. the dry run's "not a valid URL").
 
 public enum Classification: Equatable, Sendable {
-    /// e.g. "host github.com, repository TruckerPoints/trucker-points"
+    /// e.g. "host github.com, path /TruckerPoints/trucker-points"
     case matched(RuleID, explanation: String)
     case rejected(Rejection)
 }

@@ -65,8 +65,8 @@ public final class ConfigController {
             return
         }
         state = .loaded(seeded)
-        let count = RuleID.allCases.filter { config.targets[$0].binding == nil && seeded.targets[$0].binding != nil }.count
-        Log.config.info("Seeded \(count, privacy: .public) of 3 rules")
+        let count = seeded.rules.filter { config.binding(for: $0.id) == nil && $0.binding != nil }.count
+        Log.config.info("Seeded \(count, privacy: .public) of \(seeded.rules.count, privacy: .public) rules")
         onChange?()
     }
 

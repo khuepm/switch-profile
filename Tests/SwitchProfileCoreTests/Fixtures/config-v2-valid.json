@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "seedPending": false,
+  "rules": [
+    { "id": "R1", "match": { "type": "host", "host": "git.fis.vn" }, "identity": "khuepm18", "binding": { "directory": "Profile 30", "email": "khuepm18@example.com", "displayName": "khuepm18", "matchedBy": "displayName" } },
+    { "id": "R2", "match": { "type": "hostPathPrefix", "host": "github.com", "pathPrefix": "/TruckerPoints/trucker-points" }, "identity": "khue@truckerpoints.ai", "binding": { "directory": "Profile 47", "email": "khue@truckerpoints.ai", "displayName": "truckerpoints.ai" } },
+    { "id": "R5", "match": { "type": "host", "host": "example.org" }, "binding": { "directory": "Profile 8", "email": "bob@example.com", "displayName": "Profile 8" } },
+    { "id": "R3", "match": { "type": "host", "host": "github.com" }, "identity": "pmkhue.2013", "binding": null }
+  ],
+  "fallback": { },
+  "nextRuleNumber": 6,
+  "previousDefaultBrowser": { "bundleIdentifier": "com.google.Chrome", "path": "/Applications/Google Chrome.app" }
+}

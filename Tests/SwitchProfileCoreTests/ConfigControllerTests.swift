@@ -68,9 +68,9 @@ import Testing
 
         let seeded = try #require(loadedConfig(controller))
         #expect(seeded.seedPending == false)
-        #expect(seeded.targets.R1.binding?.directory == "Profile 30")
-        #expect(seeded.targets.R2.binding?.directory == "Profile 47")
-        #expect(seeded.targets.R3.binding?.directory == "Default")
+        #expect(seeded.binding(for: .r1)?.directory == "Profile 30")
+        #expect(seeded.binding(for: .r2)?.directory == "Profile 47")
+        #expect(seeded.binding(for: .r3)?.directory == "Default")
         #expect(ConfigStore(fileURL: file).load() == .loaded(seeded))
 
         let bytes = try Data(contentsOf: file)
@@ -100,7 +100,7 @@ import Testing
         second.catalogDidLoad(Fixture.validCatalog())
         let seeded = try #require(loadedConfig(second))
         #expect(seeded.seedPending == false)
-        #expect(seeded.targets.R1.binding?.directory == "Profile 30")
+        #expect(seeded.binding(for: .r1)?.directory == "Profile 30")
         #expect(seeded.previousDefaultBrowser == record)
     }
 
@@ -109,11 +109,11 @@ import Testing
         let controller = controller()
         controller.load()
         let choice = ProfileBinding(directory: "Profile 9", email: nil, displayName: "Signed out", matchedBy: nil)
-        try controller.update { $0.targets.R1.binding = choice }
+        try controller.update { $0.setBinding(choice, for: .r1) }
         controller.catalogDidLoad(Fixture.validCatalog())
         let seeded = try #require(loadedConfig(controller))
-        #expect(seeded.targets.R1.binding == choice)
-        #expect(seeded.targets.R2.binding?.directory == "Profile 47")
+        #expect(seeded.binding(for: .r1) == choice)
+        #expect(seeded.binding(for: .r2)?.directory == "Profile 47")
     }
 
     @Test func unavailableStateRefusesWritesAndSeeding() throws {
@@ -153,7 +153,7 @@ import Testing
 
         let seeded = try #require(loadedConfig(controller))
         #expect(seeded.seedPending == false)
-        #expect(seeded.targets.R3.binding?.directory == "Default")
+        #expect(seeded.binding(for: .r3)?.directory == "Default")
         #expect(ConfigStore(fileURL: file).load() == .loaded(seeded))
     }
 
@@ -176,7 +176,7 @@ import Testing
         controller.load()
         #expect(changes.value == 1)
 
-        try controller.update { $0.targets.R4.identity = "x" }
+        try controller.update { $0.fallback.identity = "x" }
         #expect(changes.value == 2)
 
         controller.catalogDidLoad(Fixture.validCatalog())   // seeding save
@@ -188,7 +188,7 @@ import Testing
         // Failed update: the directory becomes read-only.
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: dir.url.path)
         #expect(throws: ConfigError.self) {
-            try controller.update { $0.targets.R4.identity = "y" }
+            try controller.update { $0.fallback.identity = "y" }
         }
         #expect(changes.value == 3)
         try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.url.path)
@@ -201,14 +201,14 @@ import Testing
         defer { dir.cleanup() }
         let controller = controller()
         controller.load()
-        try controller.update { $0.targets.R4.identity = "kept" }
+        try controller.update { $0.fallback.identity = "kept" }
         let before = controller.state
         let bytes = try Data(contentsOf: file)
 
         try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: dir.url.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: dir.url.path) }
         do {
-            try controller.update { $0.targets.R4.identity = "lost" }
+            try controller.update { $0.fallback.identity = "lost" }
             Issue.record("expected .writeFailed")
         } catch {
             guard case .writeFailed = error else {
@@ -261,7 +261,7 @@ import Testing
         try controller.resetToDefaults(catalogLoader: fixtureLoader(controller))
         let seeded = try #require(loadedConfig(controller))
         #expect(seeded.seedPending == false)
-        #expect(seeded.targets.R1.binding?.directory == "Profile 30")
+        #expect(seeded.binding(for: .r1)?.directory == "Profile 30")
         #expect(ConfigStore(fileURL: file).load() == .loaded(seeded))
         #expect(try backups().count == 1)
     }

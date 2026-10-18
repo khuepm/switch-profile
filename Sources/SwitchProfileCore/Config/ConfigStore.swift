@@ -37,12 +37,17 @@ public struct ConfigStore: Sendable {
         } catch {
             return failed(.corrupt(Self.summary(error)))
         }
-        guard version == AppConfig.currentSchemaVersion else {
-            return failed(.unsupportedVersion(version))
-        }
-
+        // Version 1 is migrated in memory; the file is only rewritten (as the current version) by
+        // the next successful save. Any other version, including a newer one, is never touched.
         do {
-            return .loaded(try JSONDecoder().decode(AppConfig.self, from: data))
+            switch version {
+            case 1:
+                return .loaded(ConfigMigration.v2(from: try JSONDecoder().decode(AppConfigV1.self, from: data)))
+            case AppConfig.currentSchemaVersion:
+                return .loaded(try JSONDecoder().decode(AppConfig.self, from: data))
+            default:
+                return failed(.unsupportedVersion(version))
+            }
         } catch {
             return failed(.corrupt(Self.summary(error)))
         }

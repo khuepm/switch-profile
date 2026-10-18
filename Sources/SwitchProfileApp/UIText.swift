@@ -3,12 +3,18 @@ import SwitchProfileCore
 
 /// User-facing texts shared by the menu, Settings and the resolution window.
 enum UIText {
-    static func ruleDescription(_ rule: RuleID) -> String {
-        switch rule {
-        case .r1: "git.fis.vn (any path)"
-        case .r2: "github.com/TruckerPoints/trucker-points and sub-paths"
-        case .r3: "Other github.com links"
-        case .r4: "Fallback: every other http(s) link"
+    /// `config` nil (unavailable) describes the built-in rules, which routing then uses.
+    static func ruleDescription(_ rule: RuleID, config: AppConfig?) -> String {
+        if rule == .fallback { return "Fallback: every other http(s) link" }
+        let rules = config?.rules ?? AppConfig.defaultRules
+        guard let match = rules.first(where: { $0.id == rule })?.match else { return "a deleted rule" }
+        return matchDescription(match)
+    }
+
+    static func matchDescription(_ match: RuleMatch) -> String {
+        switch match {
+        case .host(let host): "\(host) (any path)"
+        case .hostPathPrefix(let host, let pathPrefix): "\(host)\(pathPrefix) and sub-paths"
         }
     }
 
@@ -41,7 +47,7 @@ enum UIText {
     static func issue(_ issue: ProfileIssue, rule: RuleID) -> String {
         switch issue {
         case .unset:
-            rule == .r4 ? "No fallback profile is set" : "No profile is set for \(rule.rawValue)"
+            rule == .fallback ? "No fallback profile is set" : "No profile is set for \(rule.rawValue)"
         case .missing(let binding):
             "Profile '\(binding.directory)' no longer exists"
         case .identityMismatch(let binding, let current):

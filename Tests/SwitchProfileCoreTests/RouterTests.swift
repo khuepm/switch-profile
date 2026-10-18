@@ -27,10 +27,10 @@ import Testing
                        r4: ProfileBinding? = nil) -> RoutingConfig {
         var config = AppConfig.unseededDefault
         config.seedPending = false
-        config.targets.R1.binding = r1
-        config.targets.R2.binding = r2
-        config.targets.R3.binding = r3
-        config.targets.R4.binding = r4
+        config.setBinding(r1, for: .r1)
+        config.setBinding(r2, for: .r2)
+        config.setBinding(r3, for: .r3)
+        config.setBinding(r4, for: .r4)
         return .loaded(config)
     }
 

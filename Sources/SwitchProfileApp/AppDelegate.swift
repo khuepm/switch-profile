@@ -195,7 +195,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, RoutingEventSink {
             statusItemController?.mappingAttention = []
             return
         }
-        let attention = ConfigValidator.needsAttention(ConfigValidator.status(config: config, catalog: catalog))
+        let attention = ConfigValidator.needsAttention(ConfigValidator.status(config: config, catalog: catalog),
+                                                       order: config.ruleOrder)
         if attention != statusItemController?.mappingAttention {
             Log.profiles.notice("Profile mapping attention: \(attention.map(\.rawValue).joined(separator: ","), privacy: .public)")
         }

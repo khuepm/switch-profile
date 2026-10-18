@@ -3,7 +3,7 @@ import Testing
 @testable import SwitchProfileCore
 
 /// #13: an unset fallback (R4 `{}` or `"binding": null`) means "Last active Chrome profile" on load,
-/// with no schema bump and no write. Fixed fallbacks are kept.
+/// with no write. Fixed fallbacks are kept. (#14 later migrates version 1 files to version 2 in memory.)
 @MainActor
 @Suite struct FallbackMigrationTests {
     static let fallbackURL = URL(string: "https://example.com/")!
@@ -34,7 +34,7 @@ import Testing
             Issue.record("expected a loaded config, got \(controller.state)")
             return
         }
-        #expect(config.targets.R4.binding == nil)
+        #expect(config.binding(for: .r4) == nil)
         let decision = Router.decide(Self.fallbackURL, config: controller.routingConfig, catalog: Self.catalog)
         guard case .launch(let target, _) = decision else {
             Issue.record("expected .launch, got \(decision)")
@@ -83,7 +83,7 @@ import Testing
             Issue.record("expected a loaded config, got \(controller.state)")
             return
         }
-        #expect(config.targets.R4.binding?.directory == "Profile 8")
+        #expect(config.binding(for: .r4)?.directory == "Profile 8")
 
         let decision = Router.decide(Self.fallbackURL, config: controller.routingConfig, catalog: Self.catalog)
         guard case .launch(let target, _) = decision else {
@@ -102,7 +102,7 @@ import Testing
 
         let first = ConfigController(store: ConfigStore(fileURL: file))
         first.load()
-        try first.update { $0.targets.R4.binding = ProfileBinding(profile: profile8, matchedBy: nil) }
+        try first.update { $0.setBinding(ProfileBinding(profile: profile8, matchedBy: nil), for: .r4) }
 
         let relaunched = ConfigController(store: ConfigStore(fileURL: file))
         relaunched.load()
@@ -110,14 +110,13 @@ import Testing
             Issue.record("expected a loaded config, got \(relaunched.state)")
             return
         }
-        #expect(reloaded.targets.R4.binding == ProfileBinding(profile: profile8, matchedBy: nil))
+        #expect(reloaded.binding(for: .r4) == ProfileBinding(profile: profile8, matchedBy: nil))
 
         // Choosing "Last active Chrome profile" again saves R4 without a binding.
-        try relaunched.update { $0.targets.R4.binding = nil }
+        try relaunched.update { $0.setBinding(nil, for: .r4) }
         let json = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
-        let targets = try #require(json["targets"] as? [String: Any])
-        let r4 = try #require(targets["R4"] as? [String: Any])
-        #expect(r4["binding"] == nil)
+        let fallback = try #require(json["fallback"] as? [String: Any])
+        #expect(fallback["binding"] == nil)
 
         let third = ConfigController(store: ConfigStore(fileURL: file))
         third.load()
@@ -130,7 +129,7 @@ import Testing
     }
 
     @Test func defaultsAndResetUseLastActive() {
-        #expect(AppConfig.unseededDefault.targets.R4.binding == nil)
+        #expect(AppConfig.unseededDefault.binding(for: .r4) == nil)
         let decision = Router.decide(Self.fallbackURL, config: .loaded(.unseededDefault), catalog: Self.catalog)
         guard case .launch(let target, _) = decision else {
             Issue.record("expected .launch, got \(decision)")
@@ -139,17 +138,18 @@ import Testing
         #expect(target.profile == .lastActiveChrome)
     }
 
-    @Test func schemaVersionUnchanged() throws {
-        #expect(AppConfig.currentSchemaVersion == 1)
+    /// #14 moved the schema to version 2; a newer file is still refused and never written.
+    @Test func newerSchemaVersionIsRefused() throws {
+        #expect(AppConfig.currentSchemaVersion == 2)
         let dir = TempDir()
         defer { dir.cleanup() }
-        let file = try install(Fixture.data("config-v2"), in: dir)
+        let file = try install(Fixture.data("config-v3"), in: dir)
         let bytes = try Data(contentsOf: file)
         let controller = ConfigController(store: ConfigStore(fileURL: file))
         controller.load()
-        #expect(controller.state == .unavailable(.unsupportedVersion(2)))
+        #expect(controller.state == .unavailable(.unsupportedVersion(3)))
         #expect(throws: ConfigError.writeFailed("configuration unavailable")) {
-            try controller.update { $0.targets.R4.binding = nil }
+            try controller.update { $0.setBinding(nil, for: .r4) }
         }
         #expect(try Data(contentsOf: file) == bytes)
     }

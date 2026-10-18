@@ -58,7 +58,7 @@ final class SettingsModel: ObservableObject {
     }
 
     func boundDirectory(_ rule: RuleID) -> String? {
-        config?.targets[rule].binding?.directory
+        config?.binding(for: rule)?.directory
     }
 
     /// The saved previous browser, when its app still exists.
@@ -105,7 +105,7 @@ final class SettingsModel: ObservableObject {
 
     func detect(rule: RuleID) {
         ruleMessages[rule] = nil
-        guard let identity = config?.targets[rule].identity else { return }
+        guard let identity = config?.identity(for: rule) else { return }
         catalog = coordinator.loadCatalog()
         guard case .loaded(let profiles) = catalog else {
             refresh()
