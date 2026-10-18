@@ -4,7 +4,7 @@
 
 Công cụ nhỏ trên macOS giúp mở link từ ứng dụng khác bằng đúng profile Google Chrome.
 
-**Trạng thái: bản demo cục bộ (v0.2.0).** Ứng dụng được build từ mã nguồn thành một `.app` cục bộ, ký ad-hoc (hoặc tải từ GitHub Releases). Trình duyệt mục tiêu ban đầu là Google Chrome.
+**Trạng thái: bản demo cục bộ (v0.3.0).** Ứng dụng được build từ mã nguồn thành một `.app` cục bộ, ký ad-hoc (hoặc tải từ GitHub Releases). Trình duyệt mục tiêu ban đầu là Google Chrome.
 
 ## Cách hoạt động
 
@@ -39,7 +39,7 @@ Tên miền được so khớp chính xác. Các tên miền con như `www.githu
 
 Tên hiển thị và địa chỉ email của profile không nhất thiết là tên thư mục. Ứng dụng ánh xạ đến thư mục profile thực tế như `Default` hoặc `Profile 2`, không suy đoán, không sửa dữ liệu đăng nhập và không âm thầm tạo profile mới.
 
-## Nội dung của v0.2.0
+## Nội dung của v0.3.0
 
 1. Ứng dụng macOS bằng AppKit chạy trên thanh menu, nhận sự kiện mở URL HTTP/HTTPS.
 2. Quy tắc repository/tên miền với thứ tự rõ ràng (sửa được trong Settings), profile dự phòng và chống vòng lặp.
@@ -137,7 +137,7 @@ Khi đặt Switch Profile làm mặc định, ứng dụng ghi lại trình duy�
 <!-- sp:version -->
 ## Phiên bản
 
-0.2.0 (build 2). Tối thiểu macOS 13 (deployment target); chỉ mới kiểm thử trên macOS 27.
+0.3.0 (build 3). Tối thiểu macOS 13 (deployment target); chỉ mới kiểm thử trên macOS 27.
 
 <!-- sp:signing -->
 ## Giới hạn về ký ứng dụng
