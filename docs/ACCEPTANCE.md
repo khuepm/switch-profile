@@ -15,11 +15,11 @@ This document tracks acceptance criteria AC-1 to AC-40 for epic [#1](https://git
 | Toolchain | Swift 6.4, Command Line Tools only (no Xcode) |
 | Date | 2026-10-13 |
 
-Environment note (macOS 27 App Data protection): when `SwitchProfile.app` is started through LaunchServices, macOS denied it read access to Chrome's `Local State` (tccd: `kTCCServiceSystemPolicyAppDataDetailed ... returning denied`). The app then reports "Chrome profiles unavailable" and keeps every link pending. The `--dry-run` command is not affected, because it runs with the terminal's access. Before the manual rows below, grant Switch Profile access in System Settings → Privacy & Security (App Data or Full Disk Access), then check the result in row P-1. Until P-1 passes, AC-25 to AC-36 and AC-40 cannot be run.
+Environment note (macOS 27 App Data protection): when `SwitchProfile.app` is started through LaunchServices, macOS denied it read access to Chrome's `Local State` (tccd: `kTCCServiceSystemPolicyAppDataDetailed ... returning denied`). The app then reports "Chrome profiles unavailable" and keeps every link pending. The `--dry-run` command runs with the terminal's access, so macOS may deny the terminal too. Since #12, both the app and the dry run then report "Chrome profiles unavailable" with the access hint, instead of "no profile set". Before the manual rows below, grant Switch Profile access in System Settings → Privacy & Security (App Data or Full Disk Access), then check the result in row P-1. Until P-1 passes, AC-25 to AC-36 and AC-40 cannot be run.
 
 ## Acceptance criteria
 
-Suites are in `Tests/SwitchProfileCoreTests/`. `Suite.test` names a swift-testing function; parameterized tests are written with `(_:)`.
+Suites are in `Tests/SwitchProfileCoreTests/` and `Tests/SwitchProfileUITests/`. `Suite.test` names a swift-testing function; parameterized tests are written with `(_:)`.
 
 | AC | Criterion | Status | Evidence or manual steps |
 | --- | --- | --- | --- |
@@ -54,7 +54,7 @@ Suites are in `Tests/SwitchProfileCoreTests/`. `Suite.test` names a swift-testin
 | AC-29 | The menu bar icon opens a menu with Settings; Settings lists detected profiles | manual-pending | Click the menu bar icon and choose "Settings…". The header shows "N profiles found in Chrome Local State" and each rule's Picker lists them. Logic tests: `LocalStateLoaderTests.validFixtureProducesSortedCatalog`; `ConfigValidatorTests.statusCoversEveryCase`. |
 | AC-30 | Mappings for R1–R3 and the fallback persist across quit and relaunch | manual-pending | Map all four rules, quit from the menu, relaunch, and check that Settings shows the same profiles (row S-6). Logic tests: `ConfigStoreTests.roundTrip`; `ConfigControllerTests.updateBeforeSeedingPersistsSeedPending`. |
 | AC-31 | On launch, a mapping to a profile that no longer exists is an actionable error | manual-pending | Rows S-1 to S-4. Logic tests: `ConfigValidatorTests.needsAttentionCountsOnlyBrokenBindings`; `RouterTests.missingDirectoryNeverLaunchesEvenWithFallbackBound`; `RoutingCoordinatorTests.tM2_updateBindingReroutesAllPendingLinksOfTheRuleInSeqOrder`, `tM3_updateBindingToNilReroutesNothing`, `tM4_failedUpdateBindingReroutesNothing`, `openAndRememberSavesLaunchesAndReroutesTheSameRule`. |
-| AC-32 | "Check rule" shows rule and profile without opening Chrome; "Open test link" uses the real routing path | manual-pending | In Settings, type each sample URL and press "Check rule": no Chrome window appears. Press "Open test link": the link opens in the expected profile. Logic tests: `ConfigValidatorTests.agreesWithRouter(_:)`; `RoutingCoordinatorTests.tM5_loadCatalogReroutesCatalogUnavailableItems` (the preview load uses `reroutingBlocked: false`); `SourceInvariantTests.dryRunIsSynchronousAndReadOnly(_:)`. |
+| AC-32 | Routing is checked without opening Chrome with `--dry-run`; Settings has no routing preview (#12) | automated-pass | `SourceInvariantTests.dryRunIsSynchronousAndReadOnly(_:)`; `SourceInvariantTests.settingsHasNoRoutingPreview(_:)`; `DryRunReportTests`; `ConfigValidatorTests.agreesWithRouter(_:)`; the "Dry-run evidence" section below. The visual check that Settings shows no "Test a link" section is row S-12. |
 | AC-33 | Each sample URL from an external app opens in the right profile with Chrome closed / running same profile / running other profile frontmost, and with Switch Profile not running | manual-pending | Matrix rows M-1 to M-36. Gate: the launch experiment below must show that `--profile-directory` is honored while Chrome is running. |
 | AC-34 | An unrelated-host link opens in the fallback profile with no re-entry into Switch Profile | manual-pending | Rows F-1 and F-2. |
 | AC-35 | A burst of links opens each link exactly once | manual-pending | Rows B-1 and B-2. |
@@ -108,6 +108,20 @@ Gate: if `--profile-directory` is ignored while Chrome is running, the launch de
 | `https://github.com/khuepm/LumiBase` | R3, `Default` | `["--profile-directory=Default","https://github.com/khuepm/LumiBase"]` |
 
 Application in every case: `/Applications/Google Chrome.app`. After the runs, `~/Library/Application Support/SwitchProfile` still did not exist.
+
+Unreadable `Local State` (#12). The fixture `local-state-valid.json` was copied to `/tmp/sp12-ls` and made unreadable with `chmod 000`, then the packaged binary was run with `--dry-run --local-state /tmp/sp12-ls --config /tmp/sp12-absent.json` and the five sample URLs (`/tmp/sp12-absent.json` does not exist). It exited 2, and no line said "has no profile set":
+
+```text
+local-state: /tmp/sp12-ls (unavailable)
+error: Chrome profiles unavailable: could not read /tmp/sp12-ls (The file “sp12-ls” couldn’t be opened because you don’t have permission to view it.)
+fix: macOS may be blocking access. Allow the terminal app that runs this command in System Settings → Privacy & Security (App Data or Full Disk Access), then run it again.
+config: /tmp/sp12-absent.json (absent, using built-in defaults)
+decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for R1 (host git.fis.vn)
+decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for R2 (host github.com, repository TruckerPoints/trucker-points)
+decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for R3 (host github.com)
+decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for R3 (host github.com)
+decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for R4 (host example.com matches no rule; fallback)
+```
 
 ## Manual matrix (manual-pending)
 
@@ -207,10 +221,13 @@ Note on "Refresh profiles": in the pending window, "Refresh profiles" reloads Ch
 | --- | --- | --- | --- | --- | --- |
 | S-6 | Persistence (AC-30) | Map R1 to R4, quit, relaunch | Same mappings shown | | |
 | S-7a | Chrome data unavailable, R3 already bound (`config.json` exists) | Bind R3 in Settings first. Quit Chrome completely. Back up `Local State`, rename it to `Local State.off`, and do not start Chrome while it is renamed. Open an R3 link. Rename the file back and press Retry. Repeat, using "Refresh profiles" instead of Retry | Pending as "Chrome profiles unavailable", Picker disabled, Retry shown; after Retry or Refresh the link opens in the bound profile | | |
-| S-7b | Genuine first run without Chrome data (no `config.json`) | Quit Switch Profile. Back up and delete `config.json`. Quit Chrome completely, rename `Local State` to `Local State.off`, and do not start Chrome while it is renamed. Launch Switch Profile and open an R3 link. Rename the file back and press "Refresh profiles" | Pending as "No profile is set for R3" (seeding could not run), Picker disabled, Retry hidden; after Refresh, seeding binds R3 and the link opens automatically in the seeded profile without "Open once" or "Open and use" | | |
+| S-7b | Genuine first run without Chrome data (no `config.json`) | Quit Switch Profile. Back up and delete `config.json`. Quit Chrome completely, rename `Local State` to `Local State.off`, and do not start Chrome while it is renamed. Launch Switch Profile and open an R3 link. Rename the file back and press "Refresh profiles" | Pending as "No profile is set for R3" (seeding could not run), Picker disabled, Retry hidden; Settings rows show "Chrome profiles unavailable – see above" (the pending window text is unchanged); after Refresh, seeding binds R3 and the link opens automatically in the seeded profile without "Open once" or "Open and use" | | |
 | S-8 | Identity mismatch | Set R1's `binding.email` in `config.json` to `other@example.com`, relaunch | The row says the profile was bound to other@example.com and is now another account; the Picker shows "<dir> (account changed)"; "Use '<name>' (now <email>)" rewrites the binding and the row turns ✓ | | |
 | S-9 | First-run auto-detect | Delete `config.json`, relaunch | Seeded rows show "Auto-detected: matched by …"; "Confirm" clears the note | | |
 | S-10 | Corrupt config | Write `{` to `config.json`, relaunch | Menu shows "Configuration error – Reset to defaults…"; Settings rows are disabled with the Reset hint; the pending window has no "Open and use"; after quitting, the file is still `{` | | |
+| S-11 | Edit shortcuts on the packaged app (#12) | Open Settings. Select a Detect message with the mouse, press Cmd+A then Cmd+C, and paste into TextEdit. Once #14 adds a Settings text field: Cmd+V pastes a URL into it, Cmd+X, Cmd+Z and Shift-Cmd-Z work, and right-click shows Cut/Copy/Paste | The copied text matches; the field shortcuts work. Logic tests: `MainMenuTests.editMenuHasStandardKeyEquivalents(_:)`, `MainMenuTests.installSetsTheApplicationMainMenu`, `SourceInvariantTests.appDelegateInstallsTheMainMenu` | | |
+| S-12 | No routing preview in Settings (#12, AC-32) | Open Settings | No "Test a link" section, no "Check rule" or "Open test link"; the default browser, Chrome profiles and routing rules sections are unchanged | | |
+| S-13 | Unreadable `Local State` in Settings (#12) | With access to `Local State` denied (see Environment note), open Settings | The header says "Chrome profiles unavailable: could not read … (…)" with the hint to allow Switch Profile in System Settings → Privacy & Security (App Data or Full Disk Access) and press Refresh; unset rows say "Chrome profiles unavailable – see above", never "Not set – choose a profile" | | |
 
 ## Known limitations
 

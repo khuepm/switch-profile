@@ -34,7 +34,6 @@ Hosts match exactly. Subdomains such as `www.github.com`, `api.github.com`, `gis
 - Default-browser status and setup instructions.
 - Detected Chrome profiles and profile selection for each rule.
 - A fallback profile selector.
-- A URL input with **Check rule** and **Open test link** actions.
 - Clear recovery options when a configured profile is missing.
 
 Profile display names and email addresses are not necessarily directory names. The app maps them to actual existing profile directories such as `Default` or `Profile 2`, without guessing, modifying login data, or silently creating a new profile.
@@ -43,7 +42,7 @@ Profile display names and email addresses are not necessarily directory names. T
 
 1. A native macOS AppKit menu bar app that receives HTTP/HTTPS URL-open events.
 2. Ordered repository/domain rules, fallback routing, and loop prevention.
-3. Menu bar access, settings, profile mapping, and a routing preview.
+3. Menu bar access, settings and profile mapping. Routing is checked from Terminal with `--dry-run`.
 4. A local `.app` built by one script, with setup and removal instructions below.
 5. Automated tests for routing, configuration, and launching. The manual checks (each profile with Chrome running and closed, and the end-to-end matrix) are tracked in the [acceptance matrix](docs/ACCEPTANCE.md).
 
@@ -76,7 +75,8 @@ Open **Settings…** from the menu bar icon. Each rule (R1 git.fis.vn, R2 trucke
 - On first run, Switch Profile detects the profiles for R1–R3 from the identities in the rule table. Such rows show "Auto-detected: matched by …". Press **Confirm** to accept, or choose another profile.
 - **Detect** looks up a rule's identity again. If more than one profile matches, nothing is chosen and you pick one.
 - R4 is the fallback for every other host. It is never chosen automatically. If it is "Not set", unrelated links wait in the pending links window.
-- **Check rule** shows the rule and profile for a URL without opening Chrome. **Open test link** sends it through the real routing path.
+- To see the rule and profile for a URL without opening Chrome, use the dry run (see **Check routing from Terminal** under Troubleshooting).
+- Text fields support the standard edit shortcuts: Cmd+X, Cmd+C, Cmd+V, Cmd+A, Cmd+Z and Shift-Cmd-Z.
 - A missing profile or an account change is flagged in the row and in the menu ("Profile mapping needs attention …").
 
 The configuration is stored in `~/Library/Application Support/SwitchProfile/config.json`. If the file is invalid, the menu shows "Configuration error – Reset to defaults…". Reset keeps a backup named `config.corrupt-<date>.json`.
@@ -91,7 +91,7 @@ You can also choose it in System Settings → Desktop & Dock → Default web bro
 <!-- sp:troubleshooting -->
 ## Troubleshooting
 
-- **"Chrome profiles unavailable" / Local State errors.** Switch Profile reads `~/Library/Application Support/Google/Chrome/Local State`. Make sure Chrome is installed and has been started once. On macOS 27, the system may deny this read to the app; grant Switch Profile access in System Settings → Privacy & Security (App Data or Full Disk Access), then press **Refresh** in Settings or **Refresh profiles** in the pending links window.
+- **"Chrome profiles unavailable" / Local State errors.** Switch Profile reads `~/Library/Application Support/Google/Chrome/Local State`. Make sure Chrome is installed and has been started once. On macOS 27, the system may deny this read to the app; grant Switch Profile access in System Settings → Privacy & Security (App Data or Full Disk Access), then press **Refresh** in Settings or **Refresh profiles** in the pending links window. Settings and the dry run say "Chrome profiles unavailable" with this fix, instead of "no profile set". The dry run runs with the terminal's access, so the terminal app that runs `--dry-run` needs the same App Data or Full Disk Access.
 - **Pending links window.** Links that cannot be opened yet (no profile set, missing profile, Chrome could not be opened) are kept, never dropped. Open the window from "Pending links (n)…" in the menu and use **Open once**, **Open and use for R…**, **Retry** or **Discard**.
 - **Another copy is the default.** If Settings says "Another copy at … is the default; remove it.", delete that copy, unregister it with `lsregister -u <path>` (full path below), then set the default again.
 - **Gatekeeper.** The app is ad-hoc signed and not notarized. If macOS blocks it, Control-click the app and choose Open, or allow it in System Settings → Privacy & Security.

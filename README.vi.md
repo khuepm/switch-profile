@@ -34,7 +34,6 @@ Tên miền được so khớp chính xác. Các tên miền con như `www.githu
 - Trạng thái trình duyệt mặc định và hướng dẫn thiết lập.
 - Danh sách profile Chrome và lựa chọn profile cho từng quy tắc.
 - Lựa chọn profile dự phòng.
-- Ô nhập URL với nút **Check rule** (kiểm tra quy tắc) và **Open test link** (mở thử).
 - Hướng xử lý rõ ràng khi profile đã cấu hình không còn tồn tại.
 
 Tên hiển thị và địa chỉ email của profile không nhất thiết là tên thư mục. Ứng dụng ánh xạ đến thư mục profile thực tế như `Default` hoặc `Profile 2`, không suy đoán, không sửa dữ liệu đăng nhập và không âm thầm tạo profile mới.
@@ -43,7 +42,7 @@ Tên hiển thị và địa chỉ email của profile không nhất thiết là
 
 1. Ứng dụng macOS bằng AppKit chạy trên thanh menu, nhận sự kiện mở URL HTTP/HTTPS.
 2. Quy tắc repository/tên miền với thứ tự rõ ràng, profile dự phòng và chống vòng lặp.
-3. Menu trên thanh menu, cài đặt, ánh xạ profile và xem trước kết quả chọn quy tắc.
+3. Menu trên thanh menu, cài đặt và ánh xạ profile. Kiểm tra định tuyến từ Terminal bằng `--dry-run`.
 4. Một `.app` cục bộ được build bằng một script, kèm hướng dẫn cài đặt và gỡ bỏ bên dưới.
 5. Kiểm thử tự động cho định tuyến, cấu hình và khởi chạy. Các bước kiểm tra thủ công (từng profile khi Chrome đang chạy và đã đóng, cùng ma trận end-to-end) được theo dõi trong [ma trận nghiệm thu](docs/ACCEPTANCE.md).
 
@@ -76,7 +75,8 @@ Mở **Settings…** từ biểu tượng trên thanh menu. Mỗi quy tắc (R1 
 - Ở lần chạy đầu, Switch Profile tự nhận diện profile cho R1–R3 theo danh tính trong bảng quy tắc. Các dòng đó hiện "Auto-detected: matched by …". Bấm **Confirm** để chấp nhận, hoặc chọn profile khác.
 - **Detect** tìm lại profile theo danh tính của quy tắc. Nếu có nhiều profile khớp, ứng dụng không tự chọn mà để bạn chọn.
 - R4 là profile dự phòng cho mọi tên miền khác và không bao giờ được chọn tự động. Nếu R4 là "Not set", các link không liên quan sẽ chờ trong cửa sổ link đang chờ.
-- **Check rule** cho biết quy tắc và profile của một URL mà không mở Chrome. **Open test link** gửi URL qua đúng luồng định tuyến thật.
+- Để xem quy tắc và profile của một URL mà không mở Chrome, dùng chạy thử (xem **Kiểm tra định tuyến từ Terminal** trong phần Xử lý sự cố).
+- Các ô nhập liệu hỗ trợ phím tắt chỉnh sửa chuẩn: Cmd+X, Cmd+C, Cmd+V, Cmd+A, Cmd+Z và Shift-Cmd-Z.
 - Profile bị mất hoặc tài khoản đã đổi được đánh dấu ở dòng tương ứng và trong menu ("Profile mapping needs attention …").
 
 Cấu hình được lưu tại `~/Library/Application Support/SwitchProfile/config.json`. Nếu tệp không hợp lệ, menu hiện "Configuration error – Reset to defaults…". Reset giữ lại bản sao lưu tên `config.corrupt-<ngày>.json`.
@@ -91,7 +91,7 @@ Bạn cũng có thể chọn trong System Settings → Desktop & Dock → Defaul
 <!-- sp:troubleshooting -->
 ## Xử lý sự cố
 
-- **"Chrome profiles unavailable" / lỗi Local State.** Switch Profile đọc `~/Library/Application Support/Google/Chrome/Local State`. Hãy chắc Chrome đã được cài và mở ít nhất một lần. Trên macOS 27, hệ thống có thể chặn ứng dụng đọc tệp này; hãy cấp quyền cho Switch Profile trong System Settings → Privacy & Security (App Data hoặc Full Disk Access), rồi bấm **Refresh** trong Settings hoặc **Refresh profiles** trong cửa sổ link đang chờ.
+- **"Chrome profiles unavailable" / lỗi Local State.** Switch Profile đọc `~/Library/Application Support/Google/Chrome/Local State`. Hãy chắc Chrome đã được cài và mở ít nhất một lần. Trên macOS 27, hệ thống có thể chặn ứng dụng đọc tệp này; hãy cấp quyền cho Switch Profile trong System Settings → Privacy & Security (App Data hoặc Full Disk Access), rồi bấm **Refresh** trong Settings hoặc **Refresh profiles** trong cửa sổ link đang chờ. Settings và lệnh chạy thử báo "Chrome profiles unavailable" kèm cách khắc phục này, thay vì "no profile set". Lệnh chạy thử dùng quyền của terminal, nên ứng dụng terminal chạy `--dry-run` cũng cần quyền App Data hoặc Full Disk Access.
 - **Cửa sổ link đang chờ.** Link chưa mở được (chưa chọn profile, profile bị mất, không mở được Chrome) được giữ lại, không bị bỏ. Mở cửa sổ từ mục "Pending links (n)…" trong menu và dùng **Open once**, **Open and use for R…**, **Retry** hoặc **Discard**.
 - **Một bản sao khác đang là mặc định.** Nếu Settings báo "Another copy at … is the default; remove it.", hãy xóa bản sao đó, hủy đăng ký bằng `lsregister -u <đường dẫn>` (đường dẫn đầy đủ ở phần Gỡ bỏ), rồi đặt mặc định lại.
 - **Gatekeeper.** Ứng dụng được ký ad-hoc và chưa notarize. Nếu macOS chặn, Control-click vào ứng dụng và chọn Open, hoặc cho phép trong System Settings → Privacy & Security.
