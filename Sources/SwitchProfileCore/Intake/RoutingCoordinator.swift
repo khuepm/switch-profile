@@ -107,6 +107,9 @@ public final class RoutingCoordinator {
     /// links when the rule can now launch: a non-nil binding, or nil for R4 ("Last active Chrome
     /// profile"). Choosing "Not set" for R1–R3 or a failed save re-routes nothing.
     public func updateBinding(rule: RuleID, to binding: ProfileBinding?) throws(ConfigError) {
+        if case .loaded(let current) = config.state, !current.contains(rule) {
+            throw .writeFailed("rule \(rule.rawValue) no longer exists")
+        }
         try config.update { $0.setBinding(binding, for: rule) }
         if binding != nil || rule == .fallback {
             reroutePending(rule: rule)
@@ -116,17 +119,50 @@ public final class RoutingCoordinator {
         }
     }
 
+    // MARK: Rule editing (#14)
+
+    /// Adds a rule directly above the fallback, saves, and re-routes waiting links.
+    @discardableResult
+    public func addRule(_ draft: RuleDraft) throws(RuleEditError) -> RuleID {
+        var added = RuleID.fallback
+        try editRules { (config: inout AppConfig) throws(RuleEditError) in
+            added = try RuleEditor.add(draft, to: &config)
+        }
+        return added
+    }
+
+    /// Changes a rule's match (id, identity and binding are kept), saves, and re-routes waiting links.
+    public func updateRule(id: RuleID, draft: RuleDraft) throws(RuleEditError) {
+        try editRules { (config: inout AppConfig) throws(RuleEditError) in
+            try RuleEditor.update(id, draft: draft, in: &config)
+        }
+    }
+
+    public func deleteRule(id: RuleID) throws(RuleEditError) {
+        try editRules { (config: inout AppConfig) throws(RuleEditError) in
+            try RuleEditor.delete(id, from: &config)
+        }
+    }
+
+    /// `offset` -1 moves the rule up one place, +1 down one place.
+    public func moveRule(id: RuleID, by offset: Int) throws(RuleEditError) {
+        try editRules { (config: inout AppConfig) throws(RuleEditError) in
+            try RuleEditor.move(id, by: offset, in: &config)
+        }
+    }
+
     /// "Reset to defaults…" for the menu and Settings. On success every
-    /// `.needsProfile(.configUnavailable)` item (all rules) is re-enqueued with its last attempt, and
-    /// every `.needsProfile(.unset)` item whose rule the reset seeded is re-enqueued as `.route`.
+    /// `.needsProfile(.configUnavailable)` item (all rules) is re-enqueued with its last attempt, every
+    /// `.needsProfile(.unset)` item whose rule the reset seeded is re-enqueued as `.route`, and so is
+    /// every re-routable item whose rule the reset removed.
     public func resetConfigToDefaults() throws(ConfigError) {
         try config.resetToDefaults(catalogLoader: { self.loadCatalog() })
         let items = pending.items.filter {
             if case .needsProfile(.configUnavailable) = $0.kind { return true }
-            return isBoundUnset($0)
+            return isBoundUnset($0) || isOrphaned($0)
         }
         for item in items {
-            requeue(item, kind: isBoundUnset(item) ? .route : item.lastAttempt)
+            requeue(item, kind: isBoundUnset(item) || isOrphaned(item) ? .route : item.lastAttempt)
         }
         startDrainIfNeeded()
         sink?.coordinatorDidChange()
@@ -148,8 +184,9 @@ public final class RoutingCoordinator {
         // 1. Exists and needs a profile.
         guard let item = pending.item(id: id) else { throw .itemNotFound }
         guard case .needsProfile = item.kind else { throw .notApplicable }
-        // 2. Configuration writable.
-        guard config.isWritable else { throw .configUnavailable }
+        // 2. Configuration writable, and the item's rule still exists (it may have been deleted).
+        guard case .loaded(let current) = config.state else { throw .configUnavailable }
+        guard current.contains(item.rule) else { throw .notApplicable }
         // 3. Fresh catalog containing the directory. This item is excluded from catalog re-routing
         //    so it cannot be queued twice.
         let catalog: ProfileCatalog
@@ -306,6 +343,40 @@ public final class RoutingCoordinator {
         if recent.count > Self.recentCapacity {
             recent.removeLast(recent.count - Self.recentCapacity)
         }
+    }
+
+    /// Validates and applies `edit` to a copy of the loaded configuration, saves it, and only on
+    /// success re-routes every waiting link: a rule change can change which rule a link matches.
+    private func editRules(_ edit: (inout AppConfig) throws(RuleEditError) -> Void) throws(RuleEditError) {
+        guard case .loaded(var edited) = config.state else { throw .configUnavailable }
+        try edit(&edited)
+        do throws(ConfigError) {
+            try config.update { $0 = edited }
+        } catch {
+            throw .saveFailed(error)
+        }
+        rerouteAfterRuleChange()
+    }
+
+    /// Re-enqueues, in ascending `seq`, every re-routable pending item of any rule as `.route`, with
+    /// the same `id` and `seq`. `.launchFailed` and `.catalogUnavailable` are left alone, like
+    /// `reroutePending(rule:)`. A link that still cannot launch becomes pending again with the same id.
+    private func rerouteAfterRuleChange() {
+        let items = pending.items.filter { Self.isReroutable($0.kind) }
+        for item in items {
+            requeue(item, kind: .route)
+        }
+        if !items.isEmpty {
+            Log.routing.info("Rules changed; re-routing \(items.count, privacy: .public) pending link(s)")
+        }
+        startDrainIfNeeded()
+        sink?.coordinatorDidChange()
+    }
+
+    /// A re-routable item whose rule is no longer in the loaded configuration.
+    private func isOrphaned(_ item: PendingItem) -> Bool {
+        guard Self.isReroutable(item.kind), case .loaded(let current) = config.state else { return false }
+        return !current.contains(item.rule)
     }
 
     /// A `.needsProfile(.unset)` item whose rule has a binding in the current configuration,
