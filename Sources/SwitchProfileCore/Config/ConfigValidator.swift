@@ -3,6 +3,8 @@ import Foundation
 /// Per-rule binding status for the Settings UI.
 public enum TargetStatus: Equatable, Sendable {
     case ok(ChromeProfile, autoDetected: MatchKind?)
+    /// R4 without a binding: unmatched links open in the last active Chrome profile.
+    case lastActiveChrome
     case unset
     case missing(ProfileBinding)
     case identityMismatch(ProfileBinding, current: ChromeProfile)
@@ -14,9 +16,11 @@ public enum ConfigValidator {
     public static func status(config: AppConfig, catalog: CatalogState) -> [RuleID: TargetStatus] {
         var result: [RuleID: TargetStatus] = [:]
         for rule in RuleID.allCases {
-            switch bindingStatus(config.targets[rule].binding, catalog: catalog) {
+            switch bindingStatus(rule: rule, config.targets[rule].binding, catalog: catalog) {
             case .ok(let binding, let profile):
                 result[rule] = .ok(profile, autoDetected: binding.matchedBy)
+            case .lastActiveChrome:
+                result[rule] = .lastActiveChrome
             case .unset:
                 result[rule] = .unset
             case .missing(let binding):
@@ -39,18 +43,18 @@ public enum ConfigValidator {
             return ProfileBinding(profile: profile, matchedBy: nil)
         case .identityMismatch(_, let current):
             return ProfileBinding(profile: current, matchedBy: nil)
-        case .ok(_, autoDetected: nil), .unset, .missing, .catalogUnavailable:
+        case .ok(_, autoDetected: nil), .lastActiveChrome, .unset, .missing, .catalogUnavailable:
             return nil
         }
     }
 
     /// Rules whose binding is broken: exactly the .missing and .identityMismatch statuses, sorted R1…R4.
-    /// .unset (normal on first run), .ok and .catalogUnavailable never count.
+    /// .unset (normal on first run), .lastActiveChrome, .ok and .catalogUnavailable never count.
     public static func needsAttention(_ statuses: [RuleID: TargetStatus]) -> [RuleID] {
         statuses.compactMap { rule, status in
             switch status {
             case .missing, .identityMismatch: rule
-            case .ok, .unset, .catalogUnavailable: nil
+            case .ok, .lastActiveChrome, .unset, .catalogUnavailable: nil
             }
         }.sorted()
     }

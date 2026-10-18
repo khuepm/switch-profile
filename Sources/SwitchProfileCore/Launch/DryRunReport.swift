@@ -26,10 +26,18 @@ public enum DryRunReport {
         switch decision {
         case .launch(let target, let explanation):
             lines.append("decision: launch, \(explanation)")
-            lines.append("profile-directory: \(target.directory)")
-            lines.append("chrome-state: " + (chromeRunning
-                ? "running, new instance forwards the command line to the running Chrome (ProcessSingleton)"
-                : "closed, cold start; waits up to 5 s for isFinishedLaunching before the next URL"))
+            switch target.profile {
+            case .directory(let directory):
+                lines.append("profile-directory: \(directory)")
+                lines.append("chrome-state: " + (chromeRunning
+                    ? "running, new instance forwards the command line to the running Chrome (ProcessSingleton)"
+                    : "closed, cold start; waits up to 5 s for isFinishedLaunching before the next URL"))
+            case .lastActiveChrome:
+                lines.append("profile-directory: none (last active Chrome profile)")
+                lines.append("chrome-state: " + (chromeRunning
+                    ? "running, new instance forwards the command line to the running Chrome (ProcessSingleton), which opens it in the profile of the most recently active window"
+                    : "closed, cold start in Chrome's last used profile (profile.last_used in Local State); waits up to 5 s for isFinishedLaunching before the next URL"))
+            }
             switch request {
             case .success(let request):
                 let application = request.applicationURL.path

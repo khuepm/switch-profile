@@ -103,11 +103,12 @@ public final class RoutingCoordinator {
     }
 
     /// The Settings write path for bindings (`SettingsModel.select`, `detect` with a unique result,
-    /// and `confirmBinding`). Saves the binding and, only on success with a non-nil binding,
-    /// re-routes the rule's pending links. Choosing "Not set" or a failed save re-routes nothing.
+    /// and `confirmBinding`). Saves the binding and, only on success, re-routes the rule's pending
+    /// links when the rule can now launch: a non-nil binding, or nil for R4 ("Last active Chrome
+    /// profile"). Choosing "Not set" for R1–R3 or a failed save re-routes nothing.
     public func updateBinding(rule: RuleID, to binding: ProfileBinding?) throws(ConfigError) {
         try config.update { $0.targets[rule].binding = binding }
-        if binding != nil {
+        if binding != nil || rule == .r4 {
             reroutePending(rule: rule)
         } else {
             startDrainIfNeeded()

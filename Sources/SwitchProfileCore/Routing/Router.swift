@@ -1,7 +1,9 @@
 import Foundation
 
-/// Pure, total routing decision: no I/O, clock or randomness. Never substitutes another
-/// rule's profile or the fallback when a rule's profile is unresolved.
+/// Pure, total routing decision: no I/O, clock or randomness. An unset fallback (R4 without a
+/// binding) launches in Chrome's last active profile, without needing the catalog. The Router
+/// never substitutes another rule's profile, the fallback, or last-active mode when a rule's
+/// binding (including a fixed fallback) is broken or cannot be checked.
 public enum Router {
     public static func decide(_ url: URL, config: RoutingConfig, catalog: CatalogState) -> RoutingDecision {
         // 1. Classify.
@@ -25,7 +27,10 @@ public enum Router {
         }
 
         // 3.–6. Binding, catalog, directory, identity.
-        switch bindingStatus(appConfig.targets[rule].binding, catalog: catalog) {
+        switch bindingStatus(rule: rule, appConfig.targets[rule].binding, catalog: catalog) {
+        case .lastActiveChrome:
+            return .launch(LaunchTarget(url: url, rule: rule, profile: .lastActiveChrome),
+                           explanation: "\(rule.rawValue): last active Chrome profile (\(explanation))")
         case .unset:
             return .needsProfile(url: url, rule: rule, issue: .unset, explanation: explanation)
         case .catalogUnavailable(let error):
@@ -46,14 +51,18 @@ public enum Router {
 /// Shared by `Router` and `ConfigValidator` so routing and Settings cannot diverge.
 enum BindingStatus: Equatable, Sendable {
     case ok(ProfileBinding, ChromeProfile)
+    /// R4 without a binding: launch without `--profile-directory`.
+    case lastActiveChrome
     case unset
     case missing(ProfileBinding)
     case identityMismatch(ProfileBinding, current: ChromeProfile)
     case catalogUnavailable(LocalStateError)
 }
 
-func bindingStatus(_ binding: ProfileBinding?, catalog: CatalogState) -> BindingStatus {
-    // 3. A rule without a binding is unset (including the fallback).
+func bindingStatus(rule: RuleID, _ binding: ProfileBinding?, catalog: CatalogState) -> BindingStatus {
+    // 3. The fallback without a binding means "Last active Chrome profile"; it needs no catalog.
+    //    Any other rule without a binding is unset.
+    if rule == .r4, binding == nil { return .lastActiveChrome }
     guard let binding else { return .unset }
     // 4. The catalog must be available.
     let profiles: ProfileCatalog

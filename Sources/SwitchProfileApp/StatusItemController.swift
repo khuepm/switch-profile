@@ -135,7 +135,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     static func describe(_ event: RecentEvent) -> String {
         switch event {
         case .opened(let host, let rule, let directory):
-            "\(host) → \(rule.rawValue) → \(directory)"
+            "\(host) → \(rule.rawValue) → \(directory ?? "last active Chrome profile")"
         case .rejected(.unsupportedScheme(let scheme)):
             "Rejected \(scheme): link"
         case .rejected(.malformed):

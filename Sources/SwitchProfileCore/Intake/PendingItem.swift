@@ -89,7 +89,8 @@ public struct PendingStore: Equatable, Sendable {
 }
 
 public enum RecentEvent: Equatable, Sendable {
-    case opened(host: String, rule: RuleID, directory: String)
+    /// `directory` is nil when the link opened in the last active Chrome profile.
+    case opened(host: String, rule: RuleID, directory: String?)
     case rejected(Rejection)
     case discarded(rule: RuleID)
 }

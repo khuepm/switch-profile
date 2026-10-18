@@ -75,10 +75,37 @@ import Testing
         #expect(launchTarget(decision)?.rule == .r2)
     }
 
-    @Test func unsetFallbackNeedsProfile() {
-        // AC-12
+    @Test func unsetFallbackLaunchesInLastActiveChrome() {
+        // AC-12 (#13)
         let decision = Router.decide(Self.fallbackURL, config: Self.config(), catalog: Self.catalog)
-        #expect(decision == .needsProfile(url: Self.fallbackURL, rule: .r4, issue: .unset, explanation: "host example.com matches no rule; fallback"))
+        #expect(decision == .launch(LaunchTarget(url: Self.fallbackURL, rule: .r4, profile: .lastActiveChrome),
+                                    explanation: "R4: last active Chrome profile (host example.com matches no rule; fallback)"))
+    }
+
+    @Test(arguments: [LocalStateError.noProfiles, .unreadable("/x/Local State", "denied")])
+    func unsetFallbackLaunchesEvenWithCatalogUnavailable(_ error: LocalStateError) {
+        let decision = Router.decide(Self.fallbackURL, config: Self.config(), catalog: .unavailable(error))
+        #expect(launchTarget(decision) == LaunchTarget(url: Self.fallbackURL, rule: .r4, profile: .lastActiveChrome))
+    }
+
+    @Test func brokenFixedFallbackNeverDropsToLastActive() {
+        let gone = ProfileBinding(directory: "Profile 99", email: "other@example.com", displayName: "Other", matchedBy: nil)
+        let decision = Router.decide(Self.fallbackURL, config: Self.config(r4: gone), catalog: Self.catalog)
+        #expect(decision == .needsProfile(url: Self.fallbackURL, rule: .r4, issue: .missing(gone),
+                                          explanation: "host example.com matches no rule; fallback"))
+    }
+
+    @Test func configUnavailableStillRefusesTheFallback() {
+        let decision = Router.decide(Self.fallbackURL, config: .unavailable(.corrupt("x")), catalog: Self.catalog)
+        #expect(issue(decision) == .configUnavailable(.corrupt("x")))
+        #expect(launchTarget(decision) == nil)
+    }
+
+    @Test func ruleMatchedLinksKeepTheirProfilesWithFallbackUnset() {
+        let config = Self.config(r4: nil)
+        #expect(launchTarget(Router.decide(Self.fisURL, config: config, catalog: Self.catalog))?.profile == .directory("Profile 30"))
+        #expect(launchTarget(Router.decide(Self.tpURL, config: config, catalog: Self.catalog))?.profile == .directory("Profile 47"))
+        #expect(launchTarget(Router.decide(Self.githubURL, config: config, catalog: Self.catalog))?.profile == .directory("Default"))
     }
 
     @Test func unsetRuleNeverFallsBack() {
@@ -147,7 +174,7 @@ import Testing
     }
 
     @Test func unsetIsReportedBeforeCatalogUnavailable() {
-        let decision = Router.decide(Self.fallbackURL, config: Self.config(), catalog: .unavailable(.noProfiles))
+        let decision = Router.decide(Self.githubURL, config: Self.config(r3: nil), catalog: .unavailable(.noProfiles))
         #expect(issue(decision) == .unset)
     }
 

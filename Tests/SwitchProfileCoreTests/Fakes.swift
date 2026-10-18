@@ -32,14 +32,18 @@ final class FakeOpener: ApplicationOpening {
 
     var callCount: Int { requests.count }
 
-    /// The `--profile-directory` value of each call.
+    /// The `--profile-directory` value of each call; `"<last active>"` when the request has none.
     var directories: [String] {
-        requests.map { String($0.arguments[0].dropFirst("--profile-directory=".count)) }
+        requests.map { request in
+            let prefix = "--profile-directory="
+            guard let element = request.arguments.first(where: { $0.hasPrefix(prefix) }) else { return "<last active>" }
+            return String(element.dropFirst(prefix.count))
+        }
     }
 
-    /// The URL argument of each call.
+    /// The URL argument of each call (always the last element).
     var urls: [String] {
-        requests.map { $0.arguments[1] }
+        requests.map { $0.arguments.last! }
     }
 
     func open(_ request: LaunchRequest) async throws {

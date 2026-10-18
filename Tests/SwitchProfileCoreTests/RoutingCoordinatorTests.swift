@@ -178,13 +178,13 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
     @Test func needsProfileGoesToPendingNotToTheOpener() async throws {
         let h = try CoordinatorHarness()
         defer { h.cleanup() }
-        try h.bind([.r3: b("Default")])
-        h.enqueue(Links.r4(1), Links.r3(2))
+        try h.bind([.r1: b("Profile 30")])
+        h.enqueue(Links.r3(1), Links.r1(2))
         await h.coordinator.waitUntilIdle()
-        #expect(h.opener.urls == [Links.r3(2).absoluteString])
-        let item = try #require(h.pendingItem(Links.r4(1)))
+        #expect(h.opener.urls == [Links.r1(2).absoluteString])
+        let item = try #require(h.pendingItem(Links.r3(1)))
         #expect(item.kind == .needsProfile(.unset))
-        #expect(item.rule == .r4)
+        #expect(item.rule == .r3)
         #expect(item.seq == 1)
     }
 
@@ -359,7 +359,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         defer { h.cleanup() }
         try h.bind([:])
         h.opener.failingCalls = [1]
-        h.enqueue(Links.r4(1))
+        h.enqueue(Links.r3(1))
         await h.coordinator.waitUntilIdle()
         let item = try #require(h.coordinator.pending.items.first)
 
@@ -420,7 +420,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness()
         defer { h.cleanup() }
         try h.bind([:])
-        h.enqueue(Links.r4(1))
+        h.enqueue(Links.r3(1))
         await h.coordinator.waitUntilIdle()
         let item = try #require(h.coordinator.pending.items.first)
         let before = h.config.state
@@ -436,13 +436,13 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness(catalog: .unavailable(.noProfiles))
         defer { h.cleanup() }
         try h.bind([:])
-        h.enqueue(Links.r4(1))
+        h.enqueue(Links.r3(1))
         await h.coordinator.waitUntilIdle()
         let item = try #require(h.coordinator.pending.items.first)
         #expect(throws: PendingActionError.catalogUnavailable(.noProfiles)) {
             try h.coordinator.openAndRemember(id: item.id, directory: "Default")
         }
-        #expect(h.loadedConfig?.targets.R4.binding == nil)
+        #expect(h.loadedConfig?.targets.R3.binding == nil)
     }
 
     @Test func openAndRememberOnALaunchFailureIsNotApplicable() async throws {
@@ -478,7 +478,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness()
         defer { h.cleanup() }
         try h.bind([:])
-        h.enqueue(Links.r4(1))
+        h.enqueue(Links.r3(1))
         await h.coordinator.waitUntilIdle()
         let item = try #require(h.coordinator.pending.items.first)
 
@@ -502,13 +502,13 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness()
         defer { h.cleanup() }
         try h.bind([:])
-        h.enqueue(Links.r4(1))
+        h.enqueue(Links.r3(1))
         await h.coordinator.waitUntilIdle()
         let item = try #require(h.coordinator.pending.items.first)
 
         try h.coordinator.discard(id: item.id)
         #expect(h.coordinator.pending.items.isEmpty)
-        #expect(h.coordinator.recent.first == .discarded(rule: .r4))
+        #expect(h.coordinator.recent.first == .discarded(rule: .r3))
         #expect(h.coordinator.unfinishedCount == 0)
     }
 
@@ -567,14 +567,14 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness()
         defer { h.cleanup() }
         try h.bind([:])
-        let urls = (1...6).map(Links.r4)
+        let urls = (1...6).map(Links.r3)
         h.coordinator.enqueue(urls, source: .external)
         await h.coordinator.waitUntilIdle()
         #expect(h.coordinator.pending.items.count == 6)
         #expect(h.coordinator.pending.items.allSatisfy { $0.kind == .needsProfile(.unset) })
 
-        try h.coordinator.updateBinding(rule: .r4, to: b("Profile 8"))
-        #expect(h.loadedConfig?.targets.R4.binding == b("Profile 8"))
+        try h.coordinator.updateBinding(rule: .r3, to: b("Profile 8"))
+        #expect(h.loadedConfig?.targets.R3.binding == b("Profile 8"))
         await h.coordinator.waitUntilIdle()
 
         #expect(h.opener.urls == urls.map(\.absoluteString))
@@ -586,17 +586,17 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness()
         defer { h.cleanup() }
         try h.bind([.r3: b("Profile 99")])
-        h.enqueue(Links.r3(1), Links.r4(2))
+        h.enqueue(Links.r3(1), Links.r1(2))
         await h.coordinator.waitUntilIdle()
         let before = h.coordinator.pending.items
         #expect(before.count == 2)
 
         try h.coordinator.updateBinding(rule: .r3, to: nil)
-        try h.coordinator.updateBinding(rule: .r4, to: nil)
         await h.coordinator.waitUntilIdle()
 
         #expect(h.loadedConfig?.targets.R3.binding == nil)
-        // Re-routing the R3 item would have turned it into `.unset`.
+        // Re-routing the R3 item would have turned it into `.unset`. (R4 is covered by
+        // choosingLastActiveForR4ReroutesItsPendingLinks: nil there means last active.)
         #expect(h.coordinator.pending.items == before)
         #expect(h.opener.callCount == 0)
     }
@@ -646,7 +646,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness(catalog: .unavailable(.notFound("/x/Local State")))
         defer { h.cleanup() }
         try h.bind([.r3: b("Default")])
-        h.enqueue(Links.r4(1), Links.r3(2))
+        h.enqueue(Links.r1(1), Links.r3(2))
         await h.coordinator.waitUntilIdle()
         let item = try #require(h.pendingItem(Links.r3(2)))
 
@@ -659,8 +659,8 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         #expect(again.id == item.id)
         #expect(again.seq == item.seq)
         #expect(again.kind == .launchFailed(.openFailed("fake open failure")))
-        // The unset R4 item is not a catalog item and was not touched.
-        #expect(h.pendingItem(Links.r4(1))?.kind == .needsProfile(.unset))
+        // The unset R1 item is not a catalog item and was not touched.
+        #expect(h.pendingItem(Links.r1(1))?.kind == .needsProfile(.unset))
     }
 
     @Test func tM6_resetConfigToDefaultsReroutesConfigUnavailableItems() async throws {
@@ -714,12 +714,13 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
     @Test func unsetLinkOfAStillUnboundRuleStaysPendingAfterACatalogLoad() async throws {
         let h = try CoordinatorHarness(catalog: .unavailable(.notFound("/x/Local State")))
         defer { h.cleanup() }
-        h.enqueue(Links.r4(1))
+        try h.bind([:])
+        h.enqueue(Links.r3(1))
         await h.coordinator.waitUntilIdle()
         let item = try #require(h.coordinator.pending.items.first)
         #expect(item.kind == .needsProfile(.unset))
 
-        // Seeding binds R1-R3 only; R4 stays "Not set".
+        // Seeding is off (bind), so R3 stays "Not set".
         h.loader.state = .loaded(Fixture.validCatalog())
         _ = h.coordinator.loadCatalog()
         await h.coordinator.waitUntilIdle()
@@ -731,20 +732,77 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness()
         defer { h.cleanup() }
         try h.bind([:])
-        h.enqueue(Links.r4(1), Links.r3(2))
+        h.enqueue(Links.r1(1), Links.r3(2))
         await h.coordinator.waitUntilIdle()
         #expect(h.coordinator.pending.items.map(\.kind) == [.needsProfile(.unset), .needsProfile(.unset)])
 
         // Seeding happens only in ConfigController.resetToDefaults, after the coordinator's load.
         h.loader.seeds = false
         try h.coordinator.resetConfigToDefaults()
+        #expect(h.loadedConfig?.targets.R1.binding?.directory == "Profile 30")
         #expect(h.loadedConfig?.targets.R3.binding?.directory == "Default")
+        #expect(h.loadedConfig?.targets.R4.binding == nil)
         await h.coordinator.waitUntilIdle()
-        #expect(h.opener.callCount == 1)
-        #expect(h.opener.directories == ["Default"])
-        #expect(h.opener.urls == [Links.r3(2).absoluteString])
-        #expect(h.pendingItem(Links.r3(2)) == nil)
-        #expect(h.pendingItem(Links.r4(1))?.kind == .needsProfile(.unset))
+        // The reset seeded R1 and R3, so both unset links open in seq order.
+        #expect(h.opener.callCount == 2)
+        #expect(h.opener.directories == ["Profile 30", "Default"])
+        #expect(h.opener.urls == [Links.r1(1).absoluteString, Links.r3(2).absoluteString])
+        #expect(h.coordinator.pending.items.isEmpty)
+    }
+
+    // MARK: #13: last active Chrome profile fallback
+
+    @Test func unsetFallbackLaunchesInLastActiveChromeWithoutPending() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([:])
+        h.enqueue(Links.r4(1))
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.requests.map(\.arguments) == [[Links.r4(1).absoluteString]])
+        #expect(h.coordinator.pending.items.isEmpty)
+        #expect(h.coordinator.recent == [.opened(host: "example.com", rule: .r4, directory: nil)])
+    }
+
+    @Test func unsetFallbackLaunchesWhileCatalogUnavailable() async throws {
+        // Absent config.json and unreadable Local State: R4 still opens, R3 cannot.
+        let h = try CoordinatorHarness(catalog: .unavailable(.notFound("/x/Local State")))
+        defer { h.cleanup() }
+        #expect(h.loadedConfig == .unseededDefault)
+        h.enqueue(Links.r4(1), Links.r3(2))
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.requests.map(\.arguments) == [[Links.r4(1).absoluteString]])
+        #expect(h.coordinator.pending.items.count == 1)
+        #expect(h.pendingItem(Links.r3(2))?.kind == .needsProfile(.unset))
+    }
+
+    @Test func choosingLastActiveForR4ReroutesItsPendingLinks() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([.r4: b("Profile 99")])
+        let urls = (1...3).map(Links.r4)
+        h.coordinator.enqueue(urls, source: .external)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.coordinator.pending.items.map(\.kind) == Array(repeating: .needsProfile(.missing(b("Profile 99"))), count: 3))
+        #expect(h.opener.callCount == 0)
+
+        try h.coordinator.updateBinding(rule: .r4, to: nil)
+        #expect(h.loadedConfig?.targets.R4.binding == nil)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.requests.map(\.arguments) == urls.map { [$0.absoluteString] })
+        #expect(h.coordinator.pending.items.isEmpty)
+    }
+
+    @Test func burstWithLastActiveFallbackKeepsOrder() async throws {
+        let h = try CoordinatorHarness()
+        defer { h.cleanup() }
+        try h.bind([.r1: b("Profile 30"), .r2: b("Profile 47"), .r3: b("Default")])
+        let urls = (1...8).map(Links.mixed)
+        h.coordinator.enqueue(urls, source: .external)
+        await h.coordinator.waitUntilIdle()
+        #expect(h.opener.urls == urls.map(\.absoluteString))
+        #expect(h.opener.directories == ["Profile 30", "Profile 47", "Default", "<last active>",
+                                         "Profile 30", "Profile 47", "Default", "<last active>"])
+        #expect(h.coordinator.pending.items.isEmpty)
     }
 
     // MARK: Design review NITs
@@ -753,7 +811,7 @@ private let directoryByRule: [RuleID: String] = [.r1: "Profile 30", .r2: "Profil
         let h = try CoordinatorHarness(catalog: .unavailable(.notFound("/x/Local State")))
         defer { h.cleanup() }
         try h.bind([:])
-        h.enqueue(Links.r4(1))
+        h.enqueue(Links.r3(1))
         await h.coordinator.waitUntilIdle()
         let item = try #require(h.coordinator.pending.items.first)
         #expect(item.kind == .needsProfile(.unset))
