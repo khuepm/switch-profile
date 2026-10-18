@@ -4,7 +4,7 @@ import Foundation
 public enum URLSource: Sendable {
     /// Delivered by macOS (`application(_:open:)`).
     case external
-    /// "Open test link" in Settings.
+    /// A link sent by an in-app test action; no current caller.
     case test
 }
 

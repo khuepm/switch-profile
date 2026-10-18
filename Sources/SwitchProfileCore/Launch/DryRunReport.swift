@@ -3,8 +3,25 @@ import Foundation
 /// Pure text rendering of what a launch would do. Used by the headless `--dry-run` command,
 /// which never opens or writes anything.
 public enum DryRunReport {
+    /// The header line(s) for the catalog. When it is unavailable, names the cause and the fix.
+    public static func localStateNote(path: String, catalog: CatalogState) -> String {
+        switch catalog {
+        case .loaded(let profiles):
+            "local-state: \(path) (\(profiles.profiles.count) profiles)"
+        case .unavailable(let error):
+            """
+            local-state: \(path) (unavailable)
+            error: \(CatalogMessages.unavailable(error))
+            fix: \(CatalogMessages.remedy(error, requester: .terminal))
+            """
+        }
+    }
+
+    /// `catalogError` is the catalog's error when it is unavailable: an unseeded rule then reports
+    /// `.unset`, and the line says Chrome profiles are unavailable instead of "has no profile set".
     public static func render(url: URL, decision: RoutingDecision,
-                              request: Result<LaunchRequest, LaunchError>?, chromeRunning: Bool) -> String {
+                              request: Result<LaunchRequest, LaunchError>?, chromeRunning: Bool,
+                              catalogError: LocalStateError? = nil) -> String {
         var lines = ["url: \(url.absoluteString)"]
         switch decision {
         case .launch(let target, let explanation):
@@ -26,7 +43,14 @@ public enum DryRunReport {
                 lines.append("launch-error: request not built")
             }
         case .needsProfile(_, let rule, let issue, let explanation):
-            lines.append("decision: needs profile, \(rule.rawValue) \(describe(issue)) (\(explanation))")
+            switch (issue, catalogError) {
+            case (.unset, .some):
+                lines.append("decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for \(rule.rawValue) (\(explanation))")
+            case (.catalogUnavailable, _):
+                lines.append("decision: needs profile, Chrome profiles unavailable, so the \(rule.rawValue) profile cannot be checked (\(explanation))")
+            default:
+                lines.append("decision: needs profile, \(rule.rawValue) \(describe(issue)) (\(explanation))")
+            }
             lines.append("profile-directory: none")
             lines.append("launch: none, the link would wait in the pending window")
         case .rejected(_, let rejection):

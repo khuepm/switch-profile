@@ -63,6 +63,45 @@ import Testing
             """)
     }
 
+    /// #12: an unseeded rule reports `.unset` while Local State is unreadable; the cause is the catalog.
+    @Test func unsetWithUnreadableCatalogSaysProfilesUnavailable() {
+        let url = URL(string: "https://git.fis.vn/x")!
+        let decision = RoutingDecision.needsProfile(url: url, rule: .r1, issue: .unset, explanation: "host git.fis.vn")
+        let text = DryRunReport.render(url: url, decision: decision, request: nil, chromeRunning: true,
+                                       catalogError: .unreadable("/x/Local State", "permission denied"))
+        #expect(text == """
+            url: https://git.fis.vn/x
+            decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for R1 (host git.fis.vn)
+            profile-directory: none
+            launch: none, the link would wait in the pending window
+            """)
+        #expect(!text.contains("has no profile set"))
+    }
+
+    @Test func catalogUnavailableIssueSaysProfilesUnavailable() {
+        let url = URL(string: "https://github.com/x")!
+        let decision = RoutingDecision.needsProfile(url: url, rule: .r3, issue: .catalogUnavailable(.noProfiles), explanation: "host github.com")
+        let text = DryRunReport.render(url: url, decision: decision, request: nil, chromeRunning: true)
+        #expect(text.contains("decision: needs profile, Chrome profiles unavailable, so the R3 profile cannot be checked (host github.com)"))
+    }
+
+    @Test func localStateNoteForUnreadableCatalogNamesTheFix() {
+        let note = DryRunReport.localStateNote(path: "/x/Local State",
+                                               catalog: .unavailable(.unreadable("/x/Local State", "permission denied")))
+        #expect(note == """
+            local-state: /x/Local State (unavailable)
+            error: Chrome profiles unavailable: could not read /x/Local State (permission denied)
+            fix: macOS may be blocking access. Allow the terminal app that runs this command in System Settings → Privacy & Security (App Data or Full Disk Access), then run it again.
+            """)
+    }
+
+    @Test func localStateNoteForLoadedCatalogCountsProfiles() {
+        let catalog = ProfileCatalog(profiles: [ChromeProfile(directory: "Default", displayName: "A", email: nil),
+                                                ChromeProfile(directory: "Profile 1", displayName: "B", email: nil)])
+        #expect(DryRunReport.localStateNote(path: "/x/Local State", catalog: .loaded(catalog))
+            == "local-state: /x/Local State (2 profiles)")
+    }
+
     @Test func rejectedHasNoArgv() {
         let url = URL(string: "ftp://github.com/x")!
         let text = DryRunReport.render(url: url, decision: .rejected(url: url, .unsupportedScheme("ftp")), request: nil, chromeRunning: true)

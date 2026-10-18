@@ -15,8 +15,6 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var recordMessage: String?
     @Published private(set) var isAwaitingConfirmation = false
     @Published private(set) var configMessage: String?
-    @Published var previewText = ""
-    @Published private(set) var previewResult: String?
 
     private let configController: ConfigController
     private let coordinator: RoutingCoordinator
@@ -47,6 +45,12 @@ final class SettingsModel: ObservableObject {
     }
 
     var isConfigWritable: Bool { config != nil }
+
+    /// Set while Chrome profiles are unavailable; unseeded rules then report `.unset` for this reason.
+    var catalogError: LocalStateError? {
+        if case .unavailable(let error) = catalog { return error }
+        return nil
+    }
 
     var catalogProfiles: [ChromeProfile] {
         if case .loaded(let catalog) = catalog { return catalog.profiles }
@@ -148,58 +152,6 @@ final class SettingsModel: ObservableObject {
             configMessage = "Reset failed: \(UIText.configError(error))"
         }
         reload()
-    }
-
-    // MARK: Test a link
-
-    /// UI-only validation, in order; nil when the text may be passed to the router.
-    static func validationMessage(_ text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty { return "Enter a URL" }
-        if trimmed.utf8.count > URLClassifier.maxURLBytes { return "URL is too long" }
-        guard let url = URL(string: trimmed) else { return "Not a valid URL" }
-        let scheme = url.scheme?.lowercased()
-        if scheme == nil || (scheme != "http" && scheme != "https" && !trimmed.contains("://")) {
-            return "Add http:// or https://"
-        }
-        return nil
-    }
-
-    var previewValidation: String? { Self.validationMessage(previewText) }
-
-    var previewIsEmpty: Bool { previewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-
-    private func previewURL() -> URL? {
-        if let message = previewValidation {
-            previewResult = message
-            return nil
-        }
-        return URL(string: previewText.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    /// Never launches: the catalog read does not re-route blocked links (AC-32).
-    func checkRule() {
-        guard let url = previewURL() else { return }
-        catalog = coordinator.loadCatalog(reroutingBlocked: false)
-        refresh()
-        switch Router.decide(url, config: configController.routingConfig, catalog: catalog) {
-        case .launch(let target, let explanation):
-            let label = catalogProfiles.first { $0.directory == target.directory }.map(UIText.profileLabel) ?? target.directory
-            previewResult = "\(explanation)\nOpens in \(label)"
-        case .needsProfile(_, let rule, let issue, let explanation):
-            previewResult = "\(rule.rawValue): \(explanation)\nWould wait for a profile: \(UIText.issue(issue, rule: rule))"
-        case .rejected(_, .unsupportedScheme(let scheme)):
-            previewResult = "Rejected: unsupported scheme \(scheme)"
-        case .rejected(_, .malformed(let reason)):
-            previewResult = "Rejected: malformed URL (\(reason))"
-        }
-    }
-
-    /// Goes through exactly the external path.
-    func openTestLink() {
-        guard let url = previewURL() else { return }
-        coordinator.enqueue([url], source: .test)
-        previewResult = "Test link sent to routing"
     }
 
     // MARK: Default browser (design §8.4)
