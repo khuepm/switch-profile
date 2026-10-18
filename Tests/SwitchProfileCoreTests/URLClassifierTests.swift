@@ -135,6 +135,12 @@ import Testing
         #expect(URLClassifier.classify(Self.url(overLimit), rules: Self.rules) == .rejected(.malformed(.tooLong)))
     }
 
+    /// The built-in rules' explanation for `url`.
+    static func explanation(_ url: URL) -> String {
+        if case .matched(_, let explanation) = URLClassifier.classify(url, rules: rules) { return explanation }
+        return ""
+    }
+
     @Test func explanationNamesHostAndPath() {
         #expect(URLClassifier.classify(Self.url("https://github.com/TruckerPoints/trucker-points"), rules: Self.rules)
             == .matched(.r2, explanation: "host github.com, path /TruckerPoints/trucker-points"))
