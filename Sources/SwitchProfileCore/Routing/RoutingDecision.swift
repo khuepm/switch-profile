@@ -34,16 +34,44 @@ public enum ProfileIssue: Equatable, Sendable {
     case configUnavailable(ConfigError)
 }
 
+/// Which Chrome profile a launch targets.
+public enum LaunchProfile: Equatable, Sendable {
+    /// A fixed profile, passed as `--profile-directory=<directory>`.
+    case directory(String)
+    /// No `--profile-directory`: Chrome opens the URL in its most recently active profile
+    /// (running), or in `profile.last_used` from Local State (closed). Only an unset R4 uses it.
+    case lastActiveChrome
+
+    /// The directory, or "last active Chrome profile"; for logs and explanations.
+    public var label: String {
+        switch self {
+        case .directory(let directory): directory
+        case .lastActiveChrome: "last active Chrome profile"
+        }
+    }
+}
+
 public struct LaunchTarget: Equatable, Sendable {
     /// The original URL object as received; never rebuilt from components.
     public let url: URL
     public let rule: RuleID
-    public let directory: String
+    public let profile: LaunchProfile
 
-    public init(url: URL, rule: RuleID, directory: String) {
+    public init(url: URL, rule: RuleID, profile: LaunchProfile) {
         self.url = url
         self.rule = rule
-        self.directory = directory
+        self.profile = profile
+    }
+
+    /// A fixed-profile target.
+    public init(url: URL, rule: RuleID, directory: String) {
+        self.init(url: url, rule: rule, profile: .directory(directory))
+    }
+
+    /// The fixed profile directory; nil in last-active mode.
+    public var directory: String? {
+        if case .directory(let directory) = profile { return directory }
+        return nil
     }
 }
 

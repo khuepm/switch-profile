@@ -108,6 +108,27 @@ import Testing
         }
     }
 
+    /// (i) Only the launcher builds the profile switch, so last-active mode cannot gain one elsewhere (#13).
+    @Test func profileDirectorySwitchIsBuiltOnlyByTheLauncher() throws {
+        let files = try Self.sourceFiles()
+        let users = Set(files.filter { $0.code.contains("--profile-directory=") }.map(\.path))
+        #expect(users == ["SwitchProfileCore/Launch/ChromeLauncher.swift"])
+    }
+
+    /// (j) Chrome is opened explicitly as a new instance (`open -na` form), never through a URL's
+    /// default handler; this is also how last-active mode reaches the running Chrome (#13).
+    @Test func openerLaunchesChromeAsANewInstance() throws {
+        let file = try #require(try Self.sourceFiles().first { $0.path == "SwitchProfileApp/WorkspaceApplicationOpener.swift" })
+        #expect(file.code.contains("createsNewApplicationInstance = true"))
+        #expect(file.code.contains("openApplication(at: request.applicationURL"))
+    }
+
+    /// (k) Settings offers the last active Chrome profile as the fallback option (#13).
+    @Test func settingsOffersLastActiveFallback() throws {
+        let file = try #require(try Self.sourceFiles().first { $0.path == "SwitchProfileApp/SettingsView.swift" })
+        #expect(file.code.contains("\"Last active Chrome profile\""))
+    }
+
     // MARK: stripComments
 
     @Test func stripsLineComment() {

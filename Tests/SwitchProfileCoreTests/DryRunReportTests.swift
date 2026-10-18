@@ -36,6 +36,55 @@ import Testing
         #expect(!text.contains("ProcessSingleton"))
     }
 
+    private func lastActive(_ string: String) -> (URL, RoutingDecision, LaunchRequest) {
+        let url = URL(string: string)!
+        let target = LaunchTarget(url: url, rule: .r4, profile: .lastActiveChrome)
+        let decision = RoutingDecision.launch(target, explanation: "R4: last active Chrome profile (host example.com matches no rule; fallback)")
+        let request = LaunchRequest(applicationURL: Self.app, arguments: [url.absoluteString])
+        return (url, decision, request)
+    }
+
+    @Test func lastActiveWithChromeRunning() {
+        let (url, decision, request) = lastActive("https://example.com/")
+        let text = DryRunReport.render(url: url, decision: decision, request: .success(request), chromeRunning: true)
+        #expect(text == """
+            url: https://example.com/
+            decision: launch, R4: last active Chrome profile (host example.com matches no rule; fallback)
+            profile-directory: none (last active Chrome profile)
+            chrome-state: running, new instance forwards the command line to the running Chrome (ProcessSingleton), which opens it in the profile of the most recently active window
+            application: /Applications/Google Chrome.app
+            argv: ["https://example.com/"]
+            equivalent (display only, never executed): open -na '/Applications/Google Chrome.app' --args 'https://example.com/'
+            """)
+    }
+
+    @Test func lastActiveWithChromeClosed() {
+        let (url, decision, request) = lastActive("https://example.com/")
+        let text = DryRunReport.render(url: url, decision: decision, request: .success(request), chromeRunning: false)
+        let lines = text.components(separatedBy: "\n")
+        #expect(lines.contains("chrome-state: closed, cold start in Chrome's last used profile (profile.last_used in Local State); waits up to 5 s for isFinishedLaunching before the next URL"))
+        #expect(lines.contains(#"argv: ["https://example.com/"]"#))
+        #expect(!text.contains("ProcessSingleton"))
+    }
+
+    /// End to end: real Router with the built-in defaults and an unreadable Local State, real launcher.
+    @MainActor
+    @Test func lastActiveArgvHasNoProfileDirectory() throws {
+        let url = URL(string: "https://example.com/")!
+        let decision = Router.decide(url, config: .loaded(.unseededDefault),
+                                     catalog: .unavailable(.unreadable("/x/Local State", "permission denied")))
+        guard case .launch(let target, _) = decision else {
+            Issue.record("expected .launch, got \(decision)")
+            return
+        }
+        let launcher = ChromeLauncher(locator: FakeLocator(), opener: FakeOpener(), ownBundleIdentifier: "io.github.khuepm.switchprofile")
+        let request = try launcher.makeRequest(for: target)
+        let text = DryRunReport.render(url: url, decision: decision, request: .success(request), chromeRunning: true)
+        #expect(text.contains("R4: last active Chrome profile"))
+        #expect(text.contains(#"argv: ["https://example.com/"]"#))
+        #expect(!text.contains("--profile-directory"))
+    }
+
     @Test func singleQuotesAreEscapedInTheDisplayLine() {
         let (url, decision, request) = launch("https://example.com/it's", directory: "Default", rule: .r4)
         let text = DryRunReport.render(url: url, decision: decision, request: .success(request), chromeRunning: true)

@@ -104,11 +104,12 @@ private struct RuleRow: View {
 
     private var status: TargetStatus? { model.statuses[rule] }
 
-    /// Also true for an unseeded rule while the catalog is unavailable (its status is `.unset`).
+    /// Also true for an unseeded rule, or R4 in last-active mode, while the catalog is unavailable,
+    /// so the picker never offers fixed profiles it cannot list.
     private var isCatalogUnavailable: Bool {
         switch status {
         case .catalogUnavailable?: true
-        case .unset?: model.catalogError != nil
+        case .unset?, .lastActiveChrome?: model.catalogError != nil
         default: false
         }
     }
@@ -123,7 +124,8 @@ private struct RuleRow: View {
                 .foregroundStyle(.secondary)
             HStack {
                 Picker("Profile for \(rule.rawValue)", selection: selection) {
-                    Text("Not set").tag(String?.none)
+                    // For R4 the nil binding means "Last active Chrome profile", the default.
+                    Text(rule == .r4 ? "Last active Chrome profile" : "Not set").tag(String?.none)
                     pickerTags
                 }
                 if rule != .r4 {
@@ -182,11 +184,14 @@ private struct RuleRow: View {
                 Button("Confirm") { model.confirmBinding(rule: rule) }
                     .disabled(isDisabled)
             }
+        case .lastActiveChrome?:
+            // Shown even while the catalog is unavailable: this mode does not need it.
+            Text("Opens in the Chrome profile you used last, like Chrome without Switch Profile")
         case .unset?:
             if model.catalogError != nil {
                 Text("Chrome profiles unavailable – see above").foregroundStyle(.secondary)
             } else {
-                Text(rule == .r4 ? "No fallback profile – choose one" : "Not set – choose a profile")
+                Text("Not set – choose a profile")
             }
         case .missing(let binding)?:
             Text("Profile '\(binding.directory)' no longer exists – choose a profile").foregroundStyle(.orange)

@@ -23,7 +23,7 @@ Rules are evaluated from specific repository matches to general domain matches.
 | Exact host `git.fis.vn`, any path | `khuepm18` | [GitLab merge requests](https://git.fis.vn/fis-gs/gs-hn/BTP_CPLQG_S7_2025_PM/plvn-v2-backend/-/merge_requests) |
 | Host `github.com`, repository `/TruckerPoints/trucker-points` and its descendants | `khue@truckerpoints.ai` | [trucker-points](https://github.com/TruckerPoints/trucker-points) |
 | Other links on exact host `github.com` | `pmkhue.2013` | [LumiBase](https://github.com/khuepm/LumiBase) |
-| Other hosts | User-selected fallback profile | Any unrelated website |
+| Other hosts | Fallback: last active Chrome profile (default) or a chosen profile | Any unrelated website |
 
 The repository rule includes paths such as `/issues` and `/pull/123`, but must not match `/TruckerPoints/trucker-points-other`. Host matching must use the parsed hostname, not a substring search. Routing preserves the original path, query, and fragment.
 
@@ -33,7 +33,7 @@ Hosts match exactly. Subdomains such as `www.github.com`, `api.github.com`, `gis
 
 - Default-browser status and setup instructions.
 - Detected Chrome profiles and profile selection for each rule.
-- A fallback profile selector.
+- A fallback selector: last active Chrome profile or a fixed profile.
 - Clear recovery options when a configured profile is missing.
 
 Profile display names and email addresses are not necessarily directory names. The app maps them to actual existing profile directories such as `Default` or `Profile 2`, without guessing, modifying login data, or silently creating a new profile.
@@ -74,7 +74,7 @@ Open **Settings…** from the menu bar icon. Each rule (R1 git.fis.vn, R2 trucke
 
 - On first run, Switch Profile detects the profiles for R1–R3 from the identities in the rule table. Such rows show "Auto-detected: matched by …". Press **Confirm** to accept, or choose another profile.
 - **Detect** looks up a rule's identity again. If more than one profile matches, nothing is chosen and you pick one.
-- R4 is the fallback for every other host. It is never chosen automatically. If it is "Not set", unrelated links wait in the pending links window.
+- R4 is the fallback for every other host. It defaults to "Last active Chrome profile": unmatched links open in the profile of the Chrome window you used last, or in Chrome's last used profile when Chrome is closed, as without Switch Profile. Choose a profile to fix the fallback instead. Existing configurations without a fallback switch to this mode automatically. A fixed fallback whose profile disappears waits in the pending links window.
 - To see the rule and profile for a URL without opening Chrome, use the dry run (see **Check routing from Terminal** under Troubleshooting).
 - Text fields support the standard edit shortcuts: Cmd+X, Cmd+C, Cmd+V, Cmd+A, Cmd+Z and Shift-Cmd-Z.
 - A missing profile or an account change is flagged in the row and in the menu ("Profile mapping needs attention …").
@@ -100,6 +100,8 @@ You can also choose it in System Settings → Desktop & Dock → Default web bro
   ```sh
   build/SwitchProfile.app/Contents/MacOS/SwitchProfile --dry-run [--assume-chrome running|closed] URL...
   ```
+
+  In last-active mode the fallback shows `R4: last active Chrome profile` and argv without `--profile-directory`.
 
 <!-- sp:restore -->
 ## Restore the previous default browser
@@ -142,7 +144,7 @@ The app is ad-hoc signed by `scripts/build-app.sh` and is not notarized. It is m
 - All three example links open in their assigned profiles from an external app.
 - Routing remains correct when a different Chrome profile is in the foreground.
 - Links work when Chrome or Switch Profile was not already running.
-- Other hosts use the explicitly selected fallback without recursively reopening Switch Profile.
+- Other hosts open in the last active Chrome profile or the selected fallback, without re-opening Switch Profile.
 - Missing or ambiguous profiles require an explicit recovery choice; no silent account substitution.
 - Multiple incoming links are neither lost nor duplicated.
 - Query strings and fragments are preserved; lookalike hosts and repository prefixes do not match.

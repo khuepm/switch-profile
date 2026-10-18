@@ -6,7 +6,8 @@ public enum ChromeApp {
     public static let bundleIdentifier = "com.google.Chrome"
 }
 
-/// One Chrome invocation: the application to open and its exact argv (no shell, no quoting).
+/// One Chrome invocation: the application to open and its exact argv (no shell, no quoting):
+/// `["--profile-directory=<dir>", url]` for a fixed profile, `[url]` in last-active mode.
 public struct LaunchRequest: Equatable, Sendable {
     public let applicationURL: URL
     public let arguments: [String]
@@ -24,6 +25,8 @@ public protocol ChromeLocating: Sendable {
 }
 
 /// Opens an application with arguments as a new instance (NSWorkspace in the app). Throws any error.
+/// The new instance forwards its argv to a running Chrome; without `--profile-directory` Chrome
+/// opens the URL in its most recently active profile.
 public protocol ApplicationOpening: Sendable {
     func open(_ request: LaunchRequest) async throws
 }

@@ -23,7 +23,7 @@
 | 主机名精确匹配 `git.fis.vn`，任意路径 | `khuepm18` | [GitLab 合并请求](https://git.fis.vn/fis-gs/gs-hn/BTP_CPLQG_S7_2025_PM/plvn-v2-backend/-/merge_requests) |
 | 主机名为 `github.com`，仓库路径 `/TruckerPoints/trucker-points` 及其子页面 | `khue@truckerpoints.ai` | [trucker-points](https://github.com/TruckerPoints/trucker-points) |
 | 主机名精确匹配 `github.com` 的其他链接 | `pmkhue.2013` | [LumiBase](https://github.com/khuepm/LumiBase) |
-| 其他主机名 | 用户选择的备用配置文件 | 任意其他网站 |
+| 其他主机名 | 备用：最近使用的 Chrome 配置文件（默认）或选定的配置文件 | 任意其他网站 |
 
 仓库规则涵盖 `/issues`、`/pull/123` 等页面，但不得匹配 `/TruckerPoints/trucker-points-other`。必须解析并匹配实际主机名，而非在整个 URL 中搜索字符串。保留原始路径、查询参数和 `#` 后的片段。
 
@@ -33,7 +33,7 @@
 
 - 默认浏览器状态及设置说明。
 - 已检测到的 Chrome 配置文件，以及各规则的配置文件选择器。
-- 备用配置文件选择器。
+- 备用选择器：最近使用的 Chrome 配置文件或固定的配置文件。
 - 配置文件不存在时的明确恢复选项。
 
 配置文件的显示名称和邮箱地址不一定等于目录名称。应用映射到实际存在的目录，如 `Default` 或 `Profile 2`，不会猜测、修改登录数据或静默创建新配置文件。
@@ -74,7 +74,7 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
 
 - 首次运行时，Switch Profile 会根据规则表中的身份为 R1–R3 自动识别配置文件，这些行显示 "Auto-detected: matched by …"。点击 **Confirm** 确认，或选择其他配置文件。
 - **Detect** 按规则的身份重新查找。如果匹配到多个配置文件，应用不会自动选择，而是由你选择。
-- R4 是所有其他主机名的备用配置文件，从不自动选择。若 R4 为 "Not set"，无关链接会在待处理链接窗口中等待。
+- R4 是所有其他主机名的备用。默认是 "Last active Chrome profile"：未匹配的链接在你最近使用的 Chrome 窗口的配置文件中打开；Chrome 未运行时，在 Chrome 上次使用的配置文件中打开，与不使用 Switch Profile 时相同。选择一个配置文件即可固定备用。没有设置备用的现有配置会自动切换到此模式。固定备用的配置文件消失时，链接会在待处理链接窗口中等待。
 - 如需查看某个 URL 对应的规则和配置文件而不打开 Chrome，请使用试运行（见“故障排除”中的**在终端中检查路由**）。
 - 文本框支持标准编辑快捷键：Cmd+X、Cmd+C、Cmd+V、Cmd+A、Cmd+Z 和 Shift-Cmd-Z。
 - 配置文件缺失或账号变更时，会在对应行和菜单中标记（"Profile mapping needs attention …"）。
@@ -100,6 +100,8 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
   ```sh
   build/SwitchProfile.app/Contents/MacOS/SwitchProfile --dry-run [--assume-chrome running|closed] URL...
   ```
+
+  在最近使用模式下，备用显示 `R4: last active Chrome profile`，argv 中没有 `--profile-directory`。
 
 <!-- sp:restore -->
 ## 恢复之前的默认浏览器
@@ -142,7 +144,7 @@ scripts/build-app.sh --install  # 同时复制到 ~/Applications/SwitchProfile.a
 - 从其他应用点击三个示例链接，均进入指定的配置文件。
 - 即使前台是另一个 Chrome 配置文件的窗口，路由仍正确。
 - Chrome 或 Switch Profile 尚未运行时也能正常打开链接。
-- 其他域名使用明确选择的备用配置文件，不循环调用 Switch Profile。
+- 其他域名在最近使用的 Chrome 配置文件或选定的备用配置文件中打开，不会再次打开 Switch Profile。
 - 配置文件缺失或无法唯一识别时，要求明确选择处理方式，不静默切换账号。
 - 连续打开多个链接时，不丢失、不重复。
 - 保留查询参数和片段；相似域名及仓库路径前缀不会误匹配。

@@ -12,7 +12,7 @@ import Testing
     static let gone = ProfileBinding(directory: "Profile 99", email: nil, displayName: "Gone", matchedBy: nil)
     static let stale = ProfileBinding(directory: "Profile 47", email: "old@example.com", displayName: "truckerpoints.ai", matchedBy: nil)
 
-    /// R1 confirmed ok, R2 identity mismatch, R3 auto-detected by local part, R4 unset.
+    /// R1 confirmed ok, R2 identity mismatch, R3 auto-detected by local part, R4 unset (last active).
     static func mixedConfig() -> AppConfig {
         var config = AppConfig.unseededDefault
         config.seedPending = false
@@ -40,7 +40,7 @@ import Testing
             .r1: .catalogUnavailable(.noProfiles),
             .r2: .catalogUnavailable(.noProfiles),
             .r3: .catalogUnavailable(.noProfiles),
-            .r4: .unset,
+            .r4: .lastActiveChrome,
         ])
     }
 
@@ -49,10 +49,10 @@ import Testing
         .loaded(ProfileCatalog(profiles: [fis, signedOut])),
         .loaded(ProfileCatalog(profiles: [ChromeProfile(directory: "Default", displayName: "Person 1", email: "someone@example.com")])),
         .unavailable(.notFound("/x")),
-    ])
-    func agreesWithRouter(_ catalog: CatalogState) {
+    ], [ProfileBinding?.some(gone), nil])
+    func agreesWithRouter(_ catalog: CatalogState, _ fallback: ProfileBinding?) {
         var config = Self.mixedConfig()
-        config.targets.R4.binding = Self.gone
+        config.targets.R4.binding = fallback
         let urls: [RuleID: URL] = [
             .r1: URL(string: "https://git.fis.vn/x")!,
             .r2: URL(string: "https://github.com/TruckerPoints/trucker-points")!,
@@ -65,6 +65,8 @@ import Testing
             switch (statuses[rule]!, decision) {
             case (.ok(let profile, _), .launch(let target, _)):
                 #expect(target.directory == profile.directory)
+            case (.lastActiveChrome, .launch(let target, _)):
+                #expect(target.profile == .lastActiveChrome)
             case (.unset, .needsProfile(_, _, .unset, _)):
                 break
             case (.missing(let a), .needsProfile(_, _, .missing(let b), _)):
@@ -94,6 +96,7 @@ import Testing
 
     @Test(arguments: [
         TargetStatus.unset,
+        .lastActiveChrome,
         .missing(gone),
         .catalogUnavailable(.noProfiles),
         .ok(fis, autoDetected: nil),
@@ -104,7 +107,7 @@ import Testing
 
     @Test func needsAttentionCountsOnlyBrokenBindings() {
         #expect(ConfigValidator.needsAttention([
-            .r1: .ok(Self.fis, autoDetected: nil), .r2: .unset, .r3: .missing(Self.gone), .r4: .unset,
+            .r1: .ok(Self.fis, autoDetected: nil), .r2: .unset, .r3: .missing(Self.gone), .r4: .lastActiveChrome,
         ]) == [.r3])
         #expect(ConfigValidator.needsAttention([
             .r1: .identityMismatch(Self.stale, current: Self.tp),
@@ -113,6 +116,7 @@ import Testing
             .r4: .ok(Self.signedOut, autoDetected: nil),
         ]) == [.r1, .r3])
         #expect(ConfigValidator.needsAttention([.r1: .unset, .r2: .unset, .r3: .unset, .r4: .unset]) == [])
+        #expect(ConfigValidator.needsAttention([.r1: .unset, .r2: .unset, .r3: .unset, .r4: .lastActiveChrome]) == [])
         let unavailable = TargetStatus.catalogUnavailable(.notFound("/x"))
         #expect(ConfigValidator.needsAttention([.r1: unavailable, .r2: unavailable, .r3: unavailable, .r4: unavailable]) == [])
     }

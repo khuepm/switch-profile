@@ -23,7 +23,7 @@ Quy tắc theo repository được ưu tiên trước quy tắc chung theo tên 
 | Tên miền chính xác `git.fis.vn`, mọi đường dẫn | `khuepm18` | [Merge requests GitLab](https://git.fis.vn/fis-gs/gs-hn/BTP_CPLQG_S7_2025_PM/plvn-v2-backend/-/merge_requests) |
 | Tên miền `github.com`, repository `/TruckerPoints/trucker-points` và các trang con | `khue@truckerpoints.ai` | [trucker-points](https://github.com/TruckerPoints/trucker-points) |
 | Các link còn lại trên tên miền chính xác `github.com` | `pmkhue.2013` | [LumiBase](https://github.com/khuepm/LumiBase) |
-| Tên miền khác | Profile dự phòng do người dùng chọn | Một website bất kỳ khác |
+| Tên miền khác | Dự phòng: profile Chrome dùng gần nhất (mặc định) hoặc một profile đã chọn | Một website bất kỳ khác |
 
 Quy tắc repository bao gồm các trang `/issues`, `/pull/123`, nhưng không được khớp `/TruckerPoints/trucker-points-other`. So khớp bằng hostname đã phân tích, không tìm chuỗi trong toàn bộ URL. Giữ nguyên đường dẫn, tham số truy vấn và phần fragment sau dấu `#`.
 
@@ -33,7 +33,7 @@ Tên miền được so khớp chính xác. Các tên miền con như `www.githu
 
 - Trạng thái trình duyệt mặc định và hướng dẫn thiết lập.
 - Danh sách profile Chrome và lựa chọn profile cho từng quy tắc.
-- Lựa chọn profile dự phòng.
+- Lựa chọn dự phòng: profile Chrome dùng gần nhất hoặc một profile cố định.
 - Hướng xử lý rõ ràng khi profile đã cấu hình không còn tồn tại.
 
 Tên hiển thị và địa chỉ email của profile không nhất thiết là tên thư mục. Ứng dụng ánh xạ đến thư mục profile thực tế như `Default` hoặc `Profile 2`, không suy đoán, không sửa dữ liệu đăng nhập và không âm thầm tạo profile mới.
@@ -74,7 +74,7 @@ Mở **Settings…** từ biểu tượng trên thanh menu. Mỗi quy tắc (R1 
 
 - Ở lần chạy đầu, Switch Profile tự nhận diện profile cho R1–R3 theo danh tính trong bảng quy tắc. Các dòng đó hiện "Auto-detected: matched by …". Bấm **Confirm** để chấp nhận, hoặc chọn profile khác.
 - **Detect** tìm lại profile theo danh tính của quy tắc. Nếu có nhiều profile khớp, ứng dụng không tự chọn mà để bạn chọn.
-- R4 là profile dự phòng cho mọi tên miền khác và không bao giờ được chọn tự động. Nếu R4 là "Not set", các link không liên quan sẽ chờ trong cửa sổ link đang chờ.
+- R4 là dự phòng cho mọi tên miền khác. Mặc định là "Last active Chrome profile": link không khớp quy tắc nào sẽ mở trong profile của cửa sổ Chrome bạn dùng gần nhất, hoặc trong profile Chrome dùng lần cuối khi Chrome đang tắt, giống như khi không có Switch Profile. Chọn một profile nếu muốn cố định dự phòng. Cấu hình cũ chưa đặt dự phòng tự chuyển sang chế độ này. Nếu profile dự phòng cố định không còn tồn tại, link sẽ chờ trong cửa sổ link đang chờ.
 - Để xem quy tắc và profile của một URL mà không mở Chrome, dùng chạy thử (xem **Kiểm tra định tuyến từ Terminal** trong phần Xử lý sự cố).
 - Các ô nhập liệu hỗ trợ phím tắt chỉnh sửa chuẩn: Cmd+X, Cmd+C, Cmd+V, Cmd+A, Cmd+Z và Shift-Cmd-Z.
 - Profile bị mất hoặc tài khoản đã đổi được đánh dấu ở dòng tương ứng và trong menu ("Profile mapping needs attention …").
@@ -100,6 +100,8 @@ Bạn cũng có thể chọn trong System Settings → Desktop & Dock → Defaul
   ```sh
   build/SwitchProfile.app/Contents/MacOS/SwitchProfile --dry-run [--assume-chrome running|closed] URL...
   ```
+
+  Ở chế độ profile dùng gần nhất, dự phòng hiển thị `R4: last active Chrome profile` và argv không có `--profile-directory`.
 
 <!-- sp:restore -->
 ## Khôi phục trình duyệt mặc định trước đó
@@ -142,7 +144,7 @@ Khi đặt Switch Profile làm mặc định, ứng dụng ghi lại trình duy�
 - Cả ba link mẫu đều mở đúng profile khi bấm từ ứng dụng khác.
 - Vẫn chọn đúng profile khi cửa sổ của profile khác đang ở phía trước.
 - Hoạt động khi Chrome hoặc Switch Profile chưa chạy.
-- Tên miền khác dùng profile dự phòng đã chọn, không gọi lặp lại Switch Profile.
+- Tên miền khác mở trong profile Chrome dùng gần nhất hoặc profile dự phòng đã chọn, không mở lại Switch Profile.
 - Profile thiếu hoặc không xác định duy nhất phải có lựa chọn xử lý rõ ràng; không âm thầm đổi tài khoản.
 - Mở nhiều link không làm mất link hoặc mở trùng.
 - Giữ nguyên query và fragment; không khớp nhầm tên miền tương tự hoặc tiền tố repository.

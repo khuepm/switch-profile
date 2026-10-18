@@ -34,7 +34,7 @@ Suites are in `Tests/SwitchProfileCoreTests/` and `Tests/SwitchProfileUITests/`.
 | AC-9 | `https://example.com/?u=https://github.com/TruckerPoints/trucker-points` → R4 | automated-pass | `URLClassifierTests.matchesR4(_:)` |
 | AC-10 | `https://git.fis.vn.example.org/` and `https://notgithub.com/` → R4 | automated-pass | `URLClassifierTests.matchesR4(_:)` |
 | AC-11 | The URL passed to the launcher equals the received URL, query and fragment included | automated-pass | `RouterTests.forwardedURLIsTheReceivedAbsoluteString(_:)` (every accepted vector, through `ChromeLauncher.makeRequest`); `RouterTests.queryAndFragmentAreForwardedLiterally`; `RouterTests.launchCarriesTheOriginalURLObject`; `URLClassifierTests.classificationNeverAltersTheURL` |
-| AC-12 | No fallback configured: an R4 URL gives an "unset fallback" decision, not a launch | automated-pass | `RouterTests.unsetFallbackNeedsProfile`; `RouterTests.unsetRuleNeverFallsBack` |
+| AC-12 | No fallback configured: an R4 URL launches in the last active Chrome profile (argv without `--profile-directory`). Superseded by #13; it used to give an "unset fallback" decision | automated-pass | `RouterTests.unsetFallbackLaunchesInLastActiveChrome`; `RouterTests.unsetFallbackLaunchesEvenWithCatalogUnavailable(_:)`; `RouterTests.brokenFixedFallbackNeverDropsToLastActive`; `RouterTests.configUnavailableStillRefusesTheFallback`; `RouterTests.ruleMatchedLinksKeepTheirProfilesWithFallbackUnset`; `RouterTests.unsetRuleNeverFallsBack`; `RoutingCoordinatorTests.unsetFallbackLaunchesInLastActiveChromeWithoutPending`; `RoutingCoordinatorTests.unsetFallbackLaunchesWhileCatalogUnavailable`; `RoutingCoordinatorTests.choosingLastActiveForR4ReroutesItsPendingLinks`; `RoutingCoordinatorTests.burstWithLastActiveFallbackKeepsOrder`; `DryRunReportTests.lastActiveWithChromeRunning`; `DryRunReportTests.lastActiveWithChromeClosed`; `DryRunReportTests.lastActiveArgvHasNoProfileDirectory`; `FallbackMigrationTests` (unset R4 `{}` and `"binding": null` load as last active without a write; fixed fallbacks kept; schema version stays 1) |
 | AC-13 | A rule whose profile is missing gives "missing profile", no launch elsewhere, no fallback launch | automated-pass | `RouterTests.missingDirectoryNeverLaunchesEvenWithFallbackBound` |
 | AC-14 | `ftp:`, `file:`, `mailto:`, `javascript:` are rejected and never launch | automated-pass | `URLClassifierTests.rejectsUnsupportedScheme(_:_:)`; `RouterTests.rejectedNeverLaunches(_:)`; `RouterTests.rejectionWinsOverUnavailableConfig` |
 | AC-15 | Rule evaluation runs without AppKit, Chrome or file access | automated-pass | `URLClassifierTests` and `RouterTests` run on in-memory values only; `SourceInvariantTests.coreImportsNoUIFramework` |
@@ -43,8 +43,8 @@ Suites are in `Tests/SwitchProfileCoreTests/` and `Tests/SwitchProfileUITests/`.
 | AC-18 | An identity matching nothing is reported missing | automated-pass | `ProfileResolverTests.notFound(_:)` |
 | AC-19 | Absent or malformed `Local State` gives a typed error, not a crash or an empty list | automated-pass | `LocalStateLoaderTests.nonexistentPathIsNotFound`, `unreadableFileIsUnreadable`, `truncatedFileIsMalformed`, `missingProfileSectionIsMalformed`, `wrongInfoCacheTypeIsMalformed`, `emptyInfoCacheIsNoProfiles`, `onlyInvalidKeysIsNoProfiles` |
 | AC-20 | The resolver reads no file other than `Local State` | automated-pass | API: `LocalStateLoader.load(from:)` takes one path and `ProfileResolver` works on an in-memory `ProfileCatalog`; `SourceInvariantTests.chromePathsAreConfined` |
-| AC-21 | The profile directory and URL are separate argv elements; no shell | automated-pass | `ChromeLauncherTests.requestIsExactlyTwoArguments`; `ChromeLauncherTests.directoryWithSpacesStaysOneElement`; `SourceInvariantTests.noForbiddenCall(_:)` (`Process(`, `/bin/sh`, `/bin/zsh`, `/usr/bin/open`) |
-| AC-22 | The launcher always targets Google Chrome and never the "open with default handler" path | automated-pass | `ChromeLauncherTests.loopGuardNeverCallsTheOpener(_:_:)`; `ChromeLauncherTests.missingChromeIsNotInstalled`; `SourceInvariantTests.noForbiddenCall(_:)` (`NSWorkspace.shared.open(`, `.open(urls`, `withApplicationAt`, `LSOpenCFURLRef`); `SourceInvariantTests.chromeLauncherIsConfined` |
+| AC-21 | The profile directory and URL are separate argv elements (two elements, or only the URL in last-active mode); no shell | automated-pass | `ChromeLauncherTests.requestIsExactlyTwoArguments`; `ChromeLauncherTests.lastActiveRequestIsTheURLOnly`; `ChromeLauncherTests.lastActiveLaunchOpensChromeWithTheURLOnly`; `ChromeLauncherTests.directoryWithSpacesStaysOneElement`; `SourceInvariantTests.noForbiddenCall(_:)` (`Process(`, `/bin/sh`, `/bin/zsh`, `/usr/bin/open`) |
+| AC-22 | The launcher always targets Google Chrome and never the "open with default handler" path | automated-pass | `ChromeLauncherTests.loopGuardNeverCallsTheOpener(_:_:)` and `ChromeLauncherTests.missingChromeIsNotInstalled` (both for a fixed profile and for last-active mode); `SourceInvariantTests.noForbiddenCall(_:)` (`NSWorkspace.shared.open(`, `.open(urls`, `withApplicationAt`, `LSOpenCFURLRef`); `SourceInvariantTests.chromeLauncherIsConfined`; `SourceInvariantTests.profileDirectorySwitchIsBuiltOnlyByTheLauncher`; `SourceInvariantTests.openerLaunchesChromeAsANewInstance` |
 | AC-23 | A burst of N ≥ 5 URLs (one event and separate events) gives exactly N launches, in order | automated-pass | `RoutingCoordinatorTests.burstOfSixPlusSixOpensTwelveInSeqOrder`; `sameURLTwiceOpensTwice`; `urlsBeforeMarkReadyAreBufferedThenLaunched`; `batchRuleLoadsTheCatalogOncePerBatch` |
 | AC-24 | A Chrome launch failure is surfaced and the URL is not silently dropped | automated-pass | `RoutingCoordinatorTests.launchFailureBecomesPendingAndLaterURLsStillLaunch`; `retryOfAFailedLaunchThatFailsAgain`; `ChromeLauncherTests.openerErrorBecomesOpenFailed`, `missingChromeIsNotInstalled`. The on-screen pending window is checked in matrix row M-PEND-1. |
 | AC-25 | After the build script, macOS lists Switch Profile as a default-browser choice | manual-pending | Run `scripts/build-app.sh --install`. Open System Settings → Desktop & Dock → Default web browser and check that "Switch Profile" is listed. Packaging evidence so far: `Info.plist` declares `http`/`https` (`plutil -p` in the build log). |
@@ -54,9 +54,9 @@ Suites are in `Tests/SwitchProfileCoreTests/` and `Tests/SwitchProfileUITests/`.
 | AC-29 | The menu bar icon opens a menu with Settings; Settings lists detected profiles | manual-pending | Click the menu bar icon and choose "Settings…". The header shows "N profiles found in Chrome Local State" and each rule's Picker lists them. Logic tests: `LocalStateLoaderTests.validFixtureProducesSortedCatalog`; `ConfigValidatorTests.statusCoversEveryCase`. |
 | AC-30 | Mappings for R1–R3 and the fallback persist across quit and relaunch | manual-pending | Map all four rules, quit from the menu, relaunch, and check that Settings shows the same profiles (row S-6). Logic tests: `ConfigStoreTests.roundTrip`; `ConfigControllerTests.updateBeforeSeedingPersistsSeedPending`. |
 | AC-31 | On launch, a mapping to a profile that no longer exists is an actionable error | manual-pending | Rows S-1 to S-4. Logic tests: `ConfigValidatorTests.needsAttentionCountsOnlyBrokenBindings`; `RouterTests.missingDirectoryNeverLaunchesEvenWithFallbackBound`; `RoutingCoordinatorTests.tM2_updateBindingReroutesAllPendingLinksOfTheRuleInSeqOrder`, `tM3_updateBindingToNilReroutesNothing`, `tM4_failedUpdateBindingReroutesNothing`, `openAndRememberSavesLaunchesAndReroutesTheSameRule`. |
-| AC-32 | Routing is checked without opening Chrome with `--dry-run`; Settings has no routing preview (#12) | automated-pass | `SourceInvariantTests.dryRunIsSynchronousAndReadOnly(_:)`; `SourceInvariantTests.settingsHasNoRoutingPreview(_:)`; `DryRunReportTests`; `ConfigValidatorTests.agreesWithRouter(_:)`; the "Dry-run evidence" section below. The visual check that Settings shows no "Test a link" section is row S-12. |
+| AC-32 | Routing is checked without opening Chrome with `--dry-run`; Settings has no routing preview (#12) | automated-pass | `SourceInvariantTests.dryRunIsSynchronousAndReadOnly(_:)`; `SourceInvariantTests.settingsHasNoRoutingPreview(_:)`; `DryRunReportTests`; `ConfigValidatorTests.agreesWithRouter(_:_:)`; the "Dry-run evidence" section below. The visual check that Settings shows no "Test a link" section is row S-12. |
 | AC-33 | Each sample URL from an external app opens in the right profile with Chrome closed / running same profile / running other profile frontmost, and with Switch Profile not running | manual-pending | Matrix rows M-1 to M-36. Gate: the launch experiment below must show that `--profile-directory` is honored while Chrome is running. |
-| AC-34 | An unrelated-host link opens in the fallback profile with no re-entry into Switch Profile | manual-pending | Rows F-1 and F-2. |
+| AC-34 | An unrelated-host link opens in the fallback profile, or in the last active Chrome profile when no fallback is fixed, with no re-entry into Switch Profile | manual-pending | Rows F-1 to F-7 and the "Last active fallback (#13)" launch experiment. |
 | AC-35 | A burst of links opens each link exactly once | manual-pending | Rows B-1 and B-2. |
 | AC-36 | The results record macOS and Chrome versions, window/tab behavior, and embedded-browser limits without claiming them | manual-pending | Environment table above, the "Tab or window" column of the matrix, and "Known limitations" below. Pending until the matrix is filled in. |
 | AC-37 | One documented command builds and signs the `.app` from a clean checkout with CLT only | automated-pass | From a fresh `git clone` of the branch (no `.build/`, `xcode-select -p` = `/Library/Developer/CommandLineTools`), `scripts/build-app.sh` exited 0 in 66 s: release build, `plutil -lint` OK, `codesign --sign -` then `codesign --verify --strict` passed, `codesign -dv` shows `Signature=adhoc` (final integration verification log). |
@@ -97,6 +97,23 @@ The directories are the ones the dry run resolved on the test Mac. Use the direc
 
 Gate: if `--profile-directory` is ignored while Chrome is running, the launch design must be revisited before AC-33 is claimed.
 
+### Last active fallback (#13)
+
+With no fixed fallback, the app launches Chrome the same way but without `--profile-directory`:
+
+```sh
+open -na "Google Chrome" --args "https://example.com/"
+```
+
+Expected, not yet observed: Chromium's `GetStartupProfilePath` returns the last used profile, without the profile picker, when the command line has URLs, and `kProfileLastUsed` is updated each time a browser window becomes active. So the tab should open in the profile of the most recently focused window (running), or in `profile.last_used` from `Local State` (closed).
+
+| Chrome state | Observed profile | Picker appeared | Tab or window | Pass |
+| --- | --- | --- | --- | --- |
+| running, profile A frontmost | | | | |
+| running, profile B frontmost | | | | |
+| closed | | | | |
+| closed, profile picker enabled at startup | | | | |
+
 ## Dry-run evidence (automated)
 
 `build/SwitchProfile.app/Contents/MacOS/SwitchProfile --dry-run` runs the real router and `ChromeLauncher.makeRequest` and prints the request without opening or writing anything. It was run with `--assume-chrome running`, `--assume-chrome closed` and with detected state (Chrome running), using the real `Local State` (33 profiles) and the in-memory seed (no config file). The three runs differ only in the `chrome-state` line. Each exited 0.
@@ -122,6 +139,20 @@ decision: needs profile, Chrome profiles unavailable, so no profile can be chose
 decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for R3 (host github.com)
 decision: needs profile, Chrome profiles unavailable, so no profile can be chosen for R4 (host example.com matches no rule; fallback)
 ```
+
+Last active fallback (#13). The packaged binary was run with `--dry-run --assume-chrome running --config /tmp/sp13-absent.json https://example.com/` (`/tmp/sp13-absent.json` does not exist, so the built-in defaults apply). It exited 0. The R4 block:
+
+```text
+url: https://example.com/
+decision: launch, R4: last active Chrome profile (host example.com matches no rule; fallback)
+profile-directory: none (last active Chrome profile)
+chrome-state: running, new instance forwards the command line to the running Chrome (ProcessSingleton), which opens it in the profile of the most recently active window
+application: /Applications/Google Chrome.app
+argv: ["https://example.com/"]
+equivalent (display only, never executed): open -na '/Applications/Google Chrome.app' --args 'https://example.com/'
+```
+
+With `--assume-chrome closed` only the state line differs: `chrome-state: closed, cold start in Chrome's last used profile (profile.last_used in Local State); waits up to 5 s for isFinishedLaunching before the next URL`. With `--local-state Tests/SwitchProfileCoreTests/Fixtures/local-state-valid.json` and the same absent config, the five sample URLs give R1 `Profile 30`, R2 `Profile 47`, R3 `Default` (twice, including `trucker-points-other`) with `--profile-directory`, and R4 last active with argv `["https://example.com/"]`. With `--config Tests/SwitchProfileCoreTests/Fixtures/config-v1-fixed-fallback.json`, the fixed fallback is kept: argv `["--profile-directory=Profile 8","https://example.com/"]`. Neither `/tmp/sp13-absent.json` nor any change under `~/Library/Application Support/SwitchProfile` resulted.
 
 ## Manual matrix (manual-pending)
 
@@ -184,7 +215,12 @@ URL 1 = git.fis.vn merge requests (R1), URL 2 = trucker-points (R2), URL 3 = Lum
 | Row | Setup | Action | Expected | Observed | Pass |
 | --- | --- | --- | --- | --- | --- |
 | F-1 | Fallback set in Settings | `open 'https://example.com/'` | Opens in the fallback profile; Switch Profile is not re-entered (Recent shows one entry) | | |
-| F-2 | Fallback "Not set" | `open 'https://example.com/'` | Pending links window appears; nothing opens; no re-entry | | |
+| F-2 | Fallback = "Last active Chrome profile", Chrome running, profile A frontmost | `open 'https://example.com/'` | Opens in A; no pending window; no re-entry (Recent shows "example.com → R4 → last active Chrome profile") | | |
+| F-3 | Fallback = "Last active Chrome profile", Chrome running, profile B frontmost | `open 'https://example.com/'` | Opens in B | | |
+| F-4 | Fallback = "Last active Chrome profile", Chrome closed | `open 'https://example.com/'` | Opens in `profile.last_used`; no profile picker; no pending window | | |
+| F-5 | Fallback = "Last active Chrome profile" | Open the git.fis.vn, trucker-points and LumiBase sample links | Each still opens in its mapped profile | | |
+| F-6 | Choose a fixed fallback in Settings, quit, relaunch | Open Settings | The fixed fallback is kept | | |
+| F-7 | `config.json` from v0.2.0 with `"R4": {}` | Launch, open Settings | R4 shows "Last active Chrome profile" without user action; the file is not rewritten | | |
 
 ### Default browser (AC-25 to AC-28)
 
@@ -199,7 +235,7 @@ URL 1 = git.fis.vn merge requests (R1), URL 2 = trucker-points (R2), URL 3 = Lum
 
 | Row | Action | Expected | Observed | Pass |
 | --- | --- | --- | --- | --- |
-| M-PEND-1 | Produce a pending link with F-2 or S-3 and inspect the pending window | Window titled "Switch Profile – Pending Links" shows the link, its rule and the reason, with Open once / Retry / Discard as applicable | | |
+| M-PEND-1 | Produce a pending link with S-3 and inspect the pending window | Window titled "Switch Profile – Pending Links" shows the link, its rule and the reason, with Open once / Retry / Discard as applicable | | |
 
 ### Missing profile (AC-31)
 
@@ -227,7 +263,8 @@ Note on "Refresh profiles": in the pending window, "Refresh profiles" reloads Ch
 | S-10 | Corrupt config | Write `{` to `config.json`, relaunch | Menu shows "Configuration error – Reset to defaults…"; Settings rows are disabled with the Reset hint; the pending window has no "Open and use"; after quitting, the file is still `{` | | |
 | S-11 | Edit shortcuts on the packaged app (#12) | Open Settings. Select a Detect message with the mouse, press Cmd+A then Cmd+C, and paste into TextEdit. Once #14 adds a Settings text field: Cmd+V pastes a URL into it, Cmd+X, Cmd+Z and Shift-Cmd-Z work, and right-click shows Cut/Copy/Paste | The copied text matches; the field shortcuts work. Logic tests: `MainMenuTests.editMenuHasStandardKeyEquivalents(_:)`, `MainMenuTests.installSetsTheApplicationMainMenu`, `SourceInvariantTests.appDelegateInstallsTheMainMenu` | | |
 | S-12 | No routing preview in Settings (#12, AC-32) | Open Settings | No "Test a link" section, no "Check rule" or "Open test link"; the default browser, Chrome profiles and routing rules sections are unchanged | | |
-| S-13 | Unreadable `Local State` in Settings (#12) | With access to `Local State` denied (see Environment note), open Settings | The header says "Chrome profiles unavailable: could not read … (…)" with the hint to allow Switch Profile in System Settings → Privacy & Security (App Data or Full Disk Access) and press Refresh; unset rows say "Chrome profiles unavailable – see above", never "Not set – choose a profile" | | |
+| S-13 | Unreadable `Local State` in Settings (#12) | With access to `Local State` denied (see Environment note), open Settings | The header says "Chrome profiles unavailable: could not read … (…)" with the hint to allow Switch Profile in System Settings → Privacy & Security (App Data or Full Disk Access) and press Refresh; unset R1–R3 rows say "Chrome profiles unavailable – see above", never "Not set – choose a profile" | | |
+| S-14 | Settings fallback default (#13) | With R4 unset (fresh install or Reset to defaults…), open Settings | The R4 Picker shows "Last active Chrome profile" selected, with "Opens in the Chrome profile you used last, like Chrome without Switch Profile"; choosing it again after a fixed profile saves R4 without a binding | | |
 
 ## Known limitations
 
