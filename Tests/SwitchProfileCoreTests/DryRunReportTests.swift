@@ -161,6 +161,37 @@ import Testing
             """)
     }
 
+    // MARK: #14: rules header
+
+    @Test func rulesNoteListsEvaluationOrder() {
+        #expect(DryRunReport.rulesNote(.loaded(.unseededDefault))
+            == "rules: R1 host git.fis.vn; R2 host github.com, path /TruckerPoints/trucker-points; R3 host github.com; R4 fallback")
+
+        var config = AppConfig.unseededDefault
+        config.rules.insert(RoutingRule(id: RuleID(number: 5), match: .host("example.org")), at: 2)
+        config.nextRuleNumber = 6
+        #expect(DryRunReport.rulesNote(.loaded(config))
+            == "rules: R1 host git.fis.vn; R2 host github.com, path /TruckerPoints/trucker-points; R5 host example.org; R3 host github.com; R4 fallback")
+
+        config.rules = []
+        #expect(DryRunReport.rulesNote(.loaded(config)) == "rules: R4 fallback")
+    }
+
+    @Test func rulesNoteForUnavailableConfig() {
+        #expect(DryRunReport.rulesNote(.unavailable(.unsupportedVersion(3)))
+            == "rules: built-in defaults (configuration unavailable)")
+    }
+
+    @Test func prefixRuleExplanationInDecisionLine() {
+        let url = URL(string: "https://github.com/TruckerPoints/trucker-points")!
+        var config = AppConfig.unseededDefault
+        config.seedPending = false
+        let decision = Router.decide(url, config: .loaded(config), catalog: .loaded(Fixture.validCatalog()))
+        let text = DryRunReport.render(url: url, decision: decision, request: nil, chromeRunning: true)
+        #expect(text.components(separatedBy: "\n").contains(
+            "decision: needs profile, R2 has no profile set (host github.com, path /TruckerPoints/trucker-points)"))
+    }
+
     @Test func neverMentionsTheOpenBinaryPath() {
         let (url, decision, request) = launch("https://github.com/x", directory: "Default", rule: .r3)
         for running in [true, false] {

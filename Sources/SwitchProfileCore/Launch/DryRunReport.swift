@@ -17,6 +17,18 @@ public enum DryRunReport {
         }
     }
 
+    /// The rules in evaluation order, e.g.
+    /// `rules: R1 host git.fis.vn; R2 host github.com, path /TruckerPoints/trucker-points; R3 host github.com; R4 fallback`.
+    public static func rulesNote(_ config: RoutingConfig) -> String {
+        switch config {
+        case .loaded(let config):
+            let rules = config.rules.map { "\($0.id.rawValue) \($0.match.summary)" } + ["\(RuleID.fallback.rawValue) fallback"]
+            return "rules: " + rules.joined(separator: "; ")
+        case .unavailable:
+            return "rules: built-in defaults (configuration unavailable)"
+        }
+    }
+
     /// `catalogError` is the catalog's error when it is unavailable: an unseeded rule then reports
     /// `.unset`, and the line says Chrome profiles are unavailable instead of "has no profile set".
     public static func render(url: URL, decision: RoutingDecision,

@@ -72,6 +72,7 @@ enum DryRunCommand {
             routingConfig = .loaded(ConfigSeeder.seed(config, catalog: profiles))
             notes.append("note: config seeded in memory (not saved)")
         }
+        notes.append(DryRunReport.rulesNote(routingConfig))
 
         notes.insert(DryRunReport.localStateNote(path: localStateURL.path, catalog: catalog), at: 0)
         let catalogError: LocalStateError?
